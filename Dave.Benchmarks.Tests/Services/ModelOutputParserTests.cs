@@ -123,7 +123,7 @@ public class ModelOutputParserTests : IAsyncLifetime
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Invalid number of columns")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Invalid number of columns")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -149,7 +149,7 @@ public class ModelOutputParserTests : IAsyncLifetime
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("failed to parse double")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("failed to parse double")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -173,7 +173,7 @@ public class ModelOutputParserTests : IAsyncLifetime
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("at least a header row")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("at least a header row")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -197,7 +197,7 @@ public class ModelOutputParserTests : IAsyncLifetime
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("unknown output file")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("unknown output file")),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
