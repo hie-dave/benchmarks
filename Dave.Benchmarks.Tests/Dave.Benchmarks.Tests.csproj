@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dave.Benchmarks.Core\Dave.Benchmarks.Core.csproj" />
+    <ProjectReference Include="..\Dave.Benchmarks.CLI\Dave.Benchmarks.CLI.csproj" />
   </ItemGroup>
 
 </Project>

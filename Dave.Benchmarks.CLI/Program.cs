@@ -1,9 +1,8 @@
 using CommandLine;
 using Dave.Benchmarks.CLI.Commands;
 using Dave.Benchmarks.CLI.Options;
-using Dave.Benchmarks.Core.Data;
+using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,18 +11,20 @@ using Microsoft.Extensions.Logging;
 var builder = Host.CreateApplicationBuilder(args);
 
 // Add services
-builder.Services.AddDbContext<BenchmarksDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection") 
-            ?? "server=localhost;database=dave_benchmarks;user=root;password=",
-        ServerVersion.AutoDetect("server=localhost;database=dave_benchmarks;user=root;password=")
-    ));
+builder.Services.AddHttpClient();
 
 // Add core services
 builder.Services.AddTransient<ModelOutputParser>();
 builder.Services.AddTransient<GitService>();
 builder.Services.AddTransient<InstructionFileParser>();
 builder.Services.AddTransient<CommandRunner>();
+
+// Configure HttpClient for ImportHandler
+builder.Services.AddHttpClient<ImportHandler>(client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["WebApiUrl"] ?? "http://localhost:5000");
+});
 
 var host = builder.Build();
 

@@ -1,158 +1,175 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Dave.Benchmarks.CLI.Models;
+using Dave.Benchmarks.Core.Models.Importer;
+using Dave.Benchmarks.Core.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.CLI.Services;
 
 public class ModelOutputParser
 {
-    private const string LonColumn = "Lon";
-    private const string LatColumn = "Lat";
-    private const string YearColumn = "Year";
-    private const string DayColumn = "Day";
+    private const string lonColumn = "Lon";
+    private const string latColumn = "Lat";
+    private const string yearColumn = "Year";
+    private const string dayColumn = "Day";
 
-    private readonly ILogger<ModelOutputParser> _logger;
+    private readonly ILogger<ModelOutputParser> logger;
 
     public ModelOutputParser(ILogger<ModelOutputParser> logger)
     {
-        _logger = logger;
+        this.logger = logger;
     }
 
     public async Task<Quantity> ParseOutputFileAsync(string filePath)
     {
-        var fileType = Path.GetFileNameWithoutExtension(filePath);
-        var metadata = OutputFileDefinitions.GetMetadata(fileType);
-        
-        if (metadata == null)
+        logger.LogInformation("Parsing output file: {filePath}", filePath);
+        string? fileType = Path.GetFileNameWithoutExtension(filePath);
+
+        using var _ = logger.BeginScope("{fileType}", fileType);
+
+        try
         {
-            throw new InvalidOperationException($"Unknown output file type: {fileType}");
+            return await ParseOutputFileInternalAsync(filePath, fileType);
         }
+        catch (Exception ex) when (ex is not InvalidDataException)
+        {
+            // Log and rethrow unexpected exceptions
+            // InvalidDataException is already logged by ExceptionHelper
+            logger.LogError(ex, "Failed to parse output file: {filePath} - {ex.Message}", filePath, ex.Message);
+            throw;
+        }
+    }
 
-        var quantity = new TimeSeriesQuantity(
-            metadata.Name,
-            metadata.Description,
-            metadata.DefaultUnits);
+    private async Task<Quantity> ParseOutputFileInternalAsync(string filePath, string fileType)
+    {
+        logger.LogDebug("Retrieving output file metadata");
+        OutputFileMetadata metadata = OutputFileDefinitions.GetMetadata(fileType);
 
-        var lines = await File.ReadAllLinesAsync(filePath);
-
+        logger.LogDebug("Reading output file");
+        string[] lines = await File.ReadAllLinesAsync(filePath);
         if (lines.Length < 2)
-        {
-            throw new InvalidDataException("File must contain at least a header row and one data row");
-        }
+            ExceptionHelper.Throw<InvalidDataException>(logger, "File must contain at least a header row and one data row");
 
-        // Parse header row to get column indices
-        var headers = lines[0].Split('\t', StringSplitOptions.RemoveEmptyEntries);
-        var columnIndices = GetColumnIndices(headers);
+        // Parse header row to get column indices.
+        logger.LogDebug("Parsing header row");
+        string[] headers = SplitLine(lines[0]);
+        IReadOnlyDictionary<string, int> indices = GetColumnIndices(headers);
+        string[] dataColumns = headers.Where(metadata.Layers.IsDataLayer).ToArray();
 
         // Create a dictionary to hold data points for each series
-        var seriesData = new Dictionary<string, List<DataPoint>>();
-        foreach (var name in headers.Skip(columnIndices.RequiredColumns.Count)) // Skip required columns
-        {
-            seriesData[name] = new List<DataPoint>();
-        }
+        Dictionary<string, List<DataPoint>> seriesData = [];
 
-        // Parse data rows
+        // Skip required columns
+        foreach (string name in dataColumns)
+            seriesData[name] = new List<DataPoint>();
+
+        // Parse data rows.
         for (int i = 1; i < lines.Length; i++)
         {
-            var values = lines[i].Split('\t', StringSplitOptions.RemoveEmptyEntries);
+            string[] values = SplitLine(lines[i]);
+            using var __ = logger.BeginScope("Row {i}", i);
+
             if (values.Length != headers.Length)
+                ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid number of columns: has {values.Length} columns but header has {headers.Length}");
+
+            // Parse required columns.
+            Coordinate point = ParseRequiredColumns(values, indices);
+
+            // Parse data values for each series.
+            logger.LogTrace("Parsing data values");
+            foreach (string name in dataColumns)
             {
-                throw new InvalidDataException($"Row {i + 1} has {values.Length} columns but header has {headers.Length}");
-            }
+                if (!double.TryParse(values[indices[name]], out double value))
+                    ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid value: failed to parse double: {values[indices[name]]}");
 
-            var point = ParseRequiredColumns(values, columnIndices, i + 1);
-
-            // Parse data values for each series
-            for (int j = columnIndices.RequiredColumns.Count; j < values.Length; j++)
-            {
-                if (!double.TryParse(values[j], out var value))
-                {
-                    throw new InvalidDataException($"Invalid value in row {i + 1}, column {j + 1}: {values[j]}");
-                }
-
-                seriesData[headers[j]].Add(point with { Value = value });
+                seriesData[name].Add(new DataPoint(point.Timestamp, point.Lon, point.Lat, value));
             }
         }
 
-        // Add series to quantity
-        foreach (var (name, points) in seriesData)
-        {
-            quantity.AddSeries(name, points);
-        }
+        logger.LogDebug("File parsed successfully");
+    
+        // Add series to quantity.
+        List<Layer> layers = [];
+        foreach ((string name, List<DataPoint> points) in seriesData)
+            layers.Add(new Layer(name, metadata.Layers.GetUnits(name), points));
 
-        return quantity;
+        return new Quantity(metadata.Name, metadata.Description, layers);
     }
 
-    private record ColumnIndices(
-        IReadOnlyDictionary<string, int> RequiredColumns,
-        IReadOnlyList<string> DataColumns);
-
-    private ColumnIndices GetColumnIndices(string[] headers)
+    /// <summary>
+    /// Split a line of text into individual columns, without parsing any values.
+    /// </summary>
+    /// <param name="line">The line of text to split.</param>
+    /// <returns>An array of columns.</returns>
+    private string[] SplitLine(string line)
     {
-        var requiredColumns = new Dictionary<string, int>();
-
-        // Find required column indices
-        foreach (var header in new[] { LonColumn, LatColumn, YearColumn })
-        {
-            var index = Array.IndexOf(headers, header);
-            if (index == -1)
-            {
-                throw new InvalidDataException($"Required column '{header}' not found in header row");
-            }
-            requiredColumns[header] = index;
-        }
-
-        // Day column is optional
-        var dayIndex = Array.IndexOf(headers, DayColumn);
-        if (dayIndex != -1)
-        {
-            requiredColumns[DayColumn] = dayIndex;
-        }
-
-        // Get data column names (everything that's not a required column)
-        var dataColumns = headers
-            .Where(h => !requiredColumns.ContainsKey(h))
-            .ToList();
-
-        if (!dataColumns.Any())
-        {
-            throw new InvalidDataException("No data columns found in header row");
-        }
-
-        return new ColumnIndices(requiredColumns, dataColumns);
+        return line.Split(['\t', ' '], StringSplitOptions.RemoveEmptyEntries);
     }
 
-    private DataPoint ParseRequiredColumns(string[] values, ColumnIndices indices, int rowNum)
+    /// <summary>
+    /// Get column indices from a header row.
+    /// </summary>
+    /// <param name="headers">The headers of the file.</param>
+    /// <returns>A dictionary mapping column names to column indices.</returns>
+    private IReadOnlyDictionary<string, int> GetColumnIndices(string[] headers)
     {
-        if (!double.TryParse(values[indices.RequiredColumns[LonColumn]], out var lon))
-        {
-            throw new InvalidDataException($"Invalid longitude in row {rowNum}: {values[indices.RequiredColumns[LonColumn]]}");
-        }
+        Dictionary<string, int> indices = [];
 
-        if (!double.TryParse(values[indices.RequiredColumns[LatColumn]], out var lat))
-        {
-            throw new InvalidDataException($"Invalid latitude in row {rowNum}: {values[indices.RequiredColumns[LatColumn]]}");
-        }
+        // Find required column indices.
+        for (int i = 0; i < headers.Length; i++)
+            indices[headers[i]] = i;
 
-        if (!int.TryParse(values[indices.RequiredColumns[YearColumn]], out var year))
-        {
-            throw new InvalidDataException($"Invalid year in row {rowNum}: {values[indices.RequiredColumns[YearColumn]]}");
-        }
+        return indices;
+    }
 
-        var day = 365; // Default to last day of year
-        if (indices.RequiredColumns.TryGetValue(DayColumn, out var dayIndex))
-        {
+    /// <summary>
+    /// The coordinate defining the spatio-temporal location of a data point.
+    /// </summary>
+    /// <param name="Lon">Longitude in degrees.</param>
+    /// <param name="Lat">Latitude in degrees.</param>
+    /// <param name="Timestamp">Date/Time of the data point.</param>
+    private record Coordinate(double Lon, double Lat, DateTime Timestamp);
+
+    /// <summary>
+    /// Parse required columns from a row of an output file.
+    /// </summary>
+    /// <param name="values">The raw values from the row.</param>
+    /// <param name="indices">The column indices for the required columns.</param>
+    /// <returns>A coordinate representing the location of the data point.</returns>
+    /// <exception cref="InvalidDataException">Thrown if the required columns cannot be parsed or contain invalid values.</exception>
+    private Coordinate ParseRequiredColumns(string[] values, IReadOnlyDictionary<string, int> indices)
+    {
+        logger.LogTrace("Parsing coordinates");
+        if (!double.TryParse(values[indices[lonColumn]], out var lon))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[lonColumn]]}");
+
+        if (!double.TryParse(values[indices[latColumn]], out var lat))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[latColumn]]}");
+
+        if (!int.TryParse(values[indices[yearColumn]], out var year))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid year: {values[indices[yearColumn]]}");
+
+        // Default to last day of year.
+        int day = 364;
+        if (indices.TryGetValue(dayColumn, out var dayIndex))
             if (!int.TryParse(values[dayIndex], out day))
-            {
-                throw new InvalidDataException($"Invalid day in row {rowNum}: {values[dayIndex]}");
-            }
-        }
+                ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid day: {values[dayIndex]}");
 
-        var timestamp = new DateTime(year, 1, 1).AddDays(day - 1); // day is 1-based
-        return new DataPoint(lon, lat, timestamp, 0); // Value will be set later
+        if (lon < 0 || lon > 360)
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[lonColumn]]}");
+
+        if (lat < -90 || lat > 90)
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[latColumn]]}");
+
+        if (day < 0 || day > 365)
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid day: {values[dayIndex]}");
+
+        DateTime timestamp = new DateTime(year, 1, 1).AddDays(day);
+        return new Coordinate(lon, lat, timestamp);
     }
 }

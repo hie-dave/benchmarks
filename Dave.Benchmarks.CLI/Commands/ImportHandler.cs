@@ -1,10 +1,12 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 using Dave.Benchmarks.CLI.Options;
-using Dave.Benchmarks.Core.Data;
-using Dave.Benchmarks.Core.Models;
+using Dave.Benchmarks.CLI.Services;
+using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using Microsoft.Extensions.Logging;
 
@@ -13,23 +15,23 @@ namespace Dave.Benchmarks.CLI.Commands;
 public class ImportHandler
 {
     private readonly ILogger<ImportHandler> _logger;
-    private readonly BenchmarksDbContext _dbContext;
     private readonly ModelOutputParser _parser;
     private readonly GitService _gitService;
     private readonly InstructionFileParser _instructionParser;
+    private readonly HttpClient _httpClient;
 
     public ImportHandler(
         ILogger<ImportHandler> logger,
-        BenchmarksDbContext dbContext,
         ModelOutputParser parser,
         GitService gitService,
-        InstructionFileParser instructionParser)
+        InstructionFileParser instructionParser,
+        HttpClient httpClient)
     {
         _logger = logger;
-        _dbContext = dbContext;
         _parser = parser;
         _gitService = gitService;
         _instructionParser = instructionParser;
+        _httpClient = httpClient;
     }
 
     public async Task HandleGriddedImport(GriddedOptions options)
@@ -102,45 +104,23 @@ public class ImportHandler
     {
         _logger.LogInformation("Importing {File}", outputFile);
 
-        var dataset = new ModelPredictionDataset
+        // Parse output file
+        Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);
+
+        var request = new ImportModelPredictionRequest
         {
             Name = name,
             Description = description,
-            CreatedAt = DateTime.UtcNow,
             ModelVersion = repoInfo.CommitHash,
             ClimateDataset = climateDataset,
             SpatialResolution = spatialResolution,
             TemporalResolution = temporalResolution,
-            CodePatches = repoInfo.Patches
+            Parameters = parameters,
+            CodePatches = repoInfo.Patches,
+            Quantity = quantity
         };
 
-        dataset.SetParameters(parameters);
-
-        // Save dataset to get an ID
-        _dbContext.ModelPredictions.Add(dataset);
-        await _dbContext.SaveChangesAsync();
-
-        // Parse output file
-        var (variables, dataPoints) = await _parser.ParseOutputFileAsync(outputFile, dataset.Id);
-
-        // Save variables to get IDs
-        await _dbContext.Variables.AddRangeAsync(variables);
-        await _dbContext.SaveChangesAsync();
-
-        // Update variable IDs in data points
-        foreach (var dataPoint in dataPoints)
-        {
-            dataPoint.VariableId = variables[dataPoint.VariableId].Id;
-        }
-
-        // Save data points in batches
-        const int batchSize = 10000;
-        for (int i = 0; i < dataPoints.Count; i += batchSize)
-        {
-            var batch = dataPoints.Skip(i).Take(batchSize);
-            await _dbContext.DataPoints.AddRangeAsync(batch);
-            await _dbContext.SaveChangesAsync();
-            _logger.LogInformation("Saved {Count} data points", i + batch.Count());
-        }
+        var response = await _httpClient.PostAsJsonAsync("api/predictions/import", request);
+        response.EnsureSuccessStatusCode();
     }
 }
