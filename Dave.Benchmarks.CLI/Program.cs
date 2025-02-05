@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-var builder = Host.CreateApplicationBuilder(args);
+HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
 // Add services
 builder.Services.AddHttpClient();
@@ -26,9 +26,9 @@ builder.Services.AddHttpClient<ImportHandler>(client =>
         builder.Configuration["WebApiUrl"] ?? "http://localhost:5000");
 });
 
-var host = builder.Build();
+IHost host = builder.Build();
 
-var runner = host.Services.GetRequiredService<CommandRunner>();
+CommandRunner runner = host.Services.GetRequiredService<CommandRunner>();
 
 // Parse command line
 return await Parser.Default.ParseArguments<GriddedOptions, SiteOptions>(args)
