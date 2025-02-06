@@ -6,7 +6,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 
 // Add database context
-builder.Services.AddDbContext<Dave.Benchmarks.Core.Data.BenchmarksContext>(options =>
+builder.Services.AddDbContext<Dave.Benchmarks.Core.Data.BenchmarksDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection")),

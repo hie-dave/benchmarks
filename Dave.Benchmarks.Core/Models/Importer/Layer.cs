@@ -25,11 +25,11 @@ public class Layer
     /// </summary>
     /// <param name="name">Name of the data column.</param>
     /// <param name="unit">Units of the data in this column.</param>
-    /// <param name="dataPoints">Data points in this column.</param>
-    public Layer(string name, Unit unit, IReadOnlyList<DataPoint> dataPoints)
+    /// <param name="data">Data points in this column.</param>
+    public Layer(string name, Unit unit, IReadOnlyList<DataPoint> data)
     {
         Name = name;
         Unit = unit;
-        Data = dataPoints;
+        Data = data;
     }
 }

@@ -26,6 +26,7 @@ public class GitService
 
     public RepositoryInfo GetRepositoryInfo(string path, string? explicitRepoPath = null)
     {
+        using var _ = _logger.BeginScope("git");
         var repoPath = explicitRepoPath ?? FindRepositoryPath(path);
         if (string.IsNullOrEmpty(repoPath))
         {

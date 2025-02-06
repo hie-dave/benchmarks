@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Dave.Benchmarks.Core.Data;
-using Dave.Benchmarks.Core.Models;
+using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -47,6 +47,36 @@ public class PredictionsController : ControllerBase
         };
 
         dataset.SetParameters(request.Parameters);
+
+        // Create variable for the quantity
+        var variable = new Variable
+        {
+            Name = request.Quantity.Name,
+            Description = request.Quantity.Description,
+            Dataset = dataset
+        };
+
+        // Create data points for each layer's data
+        foreach (Layer layer in request.Quantity.Layers)
+        {
+            variable.Units = layer.Unit.ToString();
+            
+            foreach (var point in layer.Data)
+            {
+                var measurementPoint = new Datum
+                {
+                    Dataset = dataset,
+                    Variable = variable,
+                    Longitude = point.Longitude,
+                    Latitude = point.Latitude,
+                    Timestamp = point.Timestamp,
+                    Value = point.Value
+                };
+                dataset.Data.Add(measurementPoint);
+            }
+        }
+
+        dataset.Variables.Add(variable);
 
         // Save dataset
         _dbContext.ModelPredictions.Add(dataset);

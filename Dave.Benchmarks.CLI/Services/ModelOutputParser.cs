@@ -13,11 +13,6 @@ namespace Dave.Benchmarks.CLI.Services;
 
 public class ModelOutputParser
 {
-    private const string lonColumn = "Lon";
-    private const string latColumn = "Lat";
-    private const string yearColumn = "Year";
-    private const string dayColumn = "Day";
-
     private readonly ILogger<ModelOutputParser> logger;
 
     public ModelOutputParser(ILogger<ModelOutputParser> logger)
@@ -145,26 +140,26 @@ public class ModelOutputParser
     private Coordinate ParseRequiredColumns(string[] values, IReadOnlyDictionary<string, int> indices)
     {
         logger.LogTrace("Parsing coordinates");
-        if (!double.TryParse(values[indices[lonColumn]], out var lon))
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[lonColumn]]}");
+        if (!double.TryParse(values[indices[ModelConstants.LonLayer]], out var lon))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[ModelConstants.LonLayer]]}");
 
-        if (!double.TryParse(values[indices[latColumn]], out var lat))
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[latColumn]]}");
+        if (!double.TryParse(values[indices[ModelConstants.LatLayer]], out var lat))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[ModelConstants.LatLayer]]}");
 
-        if (!int.TryParse(values[indices[yearColumn]], out var year))
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid year: {values[indices[yearColumn]]}");
+        if (!int.TryParse(values[indices[ModelConstants.YearLayer]], out var year))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid year: {values[indices[ModelConstants.YearLayer]]}");
 
         // Default to last day of year.
         int day = 364;
-        if (indices.TryGetValue(dayColumn, out var dayIndex))
+        if (indices.TryGetValue(ModelConstants.DayLayer, out var dayIndex))
             if (!int.TryParse(values[dayIndex], out day))
                 ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid day: {values[dayIndex]}");
 
         if (lon < 0 || lon > 360)
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[lonColumn]]}");
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[ModelConstants.LonLayer]]}");
 
         if (lat < -90 || lat > 90)
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[latColumn]]}");
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[ModelConstants.LatLayer]]}");
 
         if (day < 0 || day > 365)
             ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid day: {values[dayIndex]}");

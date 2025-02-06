@@ -1,6 +1,9 @@
-namespace Dave.Benchmarks.Core.Models;
+namespace Dave.Benchmarks.Core.Models.Entities;
 
-public class DataPoint
+/// <summary>
+/// Represents a single measurement point in a dataset, containing a value at a specific location and time.
+/// </summary>
+public class Datum
 {
     public long Id { get; set; }
     public double Longitude { get; set; }

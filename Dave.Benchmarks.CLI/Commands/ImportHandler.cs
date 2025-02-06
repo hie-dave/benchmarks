@@ -8,17 +8,25 @@ using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
+using Dave.Benchmarks.Core.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.CLI.Commands;
 
+/// <summary>
+/// Handles importing model predictions from output files to the database.
+/// </summary>
 public class ImportHandler
 {
+    private const string endpoint = "api/predictions/import";
+
     private readonly ILogger<ImportHandler> _logger;
     private readonly ModelOutputParser _parser;
     private readonly GitService _gitService;
     private readonly InstructionFileParser _instructionParser;
     private readonly HttpClient _httpClient;
+
+    private const double StaleFileThresholdSeconds = 5.0; // Files more than 5 seconds older than the newest file are considered stale
 
     public ImportHandler(
         ILogger<ImportHandler> logger,
@@ -32,20 +40,83 @@ public class ImportHandler
         _gitService = gitService;
         _instructionParser = instructionParser;
         _httpClient = httpClient;
+
+        if (_httpClient.BaseAddress == null)
+            throw new InvalidOperationException("ImportHandler: Base address is null");
     }
 
+    /// <summary>
+    /// Gets the most recent write time from a set of output files
+    /// </summary>
+    /// <param name="outputFiles">The files to check.</param>
+    /// <returns>The most recent write time.</returns>
+    private DateTime GetMostRecentWriteTime(string[] outputFiles)
+    {
+        return outputFiles
+            .Select(f => new FileInfo(f))
+            .Max(f => f.LastWriteTime);
+    }
+
+    /// <summary>
+    /// Checks if a file is stale by comparing its write time to the most recent write time
+    /// </summary>
+    /// <param name="filePath">The path to the file.</param>
+    /// <param name="mostRecentWriteTime">The most recent write time.</param>
+    /// <returns>True if the file is stale, false otherwise.</returns>
+    private bool IsStaleFile(string filePath, DateTime mostRecentWriteTime)
+    {
+        FileInfo fileInfo = new(filePath);
+        TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
+        
+        return age.TotalSeconds > StaleFileThresholdSeconds;
+    }
+
+    /// <summary>
+    /// Emits a warning for a stale file.
+    /// </summary>
+    /// <param name="filePath">The path to the file.</param>
+    /// <param name="mostRecentWriteTime">The most recent write time.</param>
+    private void EmitStaleFileWarning(string filePath, DateTime mostRecentWriteTime)
+    {
+        FileInfo fileInfo = new(filePath);
+        TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
+        
+        _logger.LogWarning("Skipping stale output file (age: {age}): {filePath}", 
+            TimeUtils.FormatTimeSpan(age),
+            filePath);
+    }
+
+    /// <summary>
+    /// Import all output files from a gridded run and upload them to the DB.
+    /// </summary>
+    /// <param name="options">The options for the gridded import.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task HandleGriddedImport(GriddedOptions options)
     {
         // Get repository info
-        var repoInfo = _gitService.GetRepositoryInfo(options.InstructionFile, options.RepoPath);
+        using var _ = _logger.BeginScope("importer");
+        GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(options.InstructionFile, options.RepoPath);
 
         // Parse instruction file
-        var parameters = await _instructionParser.ParseInstructionFileAsync(options.InstructionFile);
+        string parameters = await _instructionParser.ParseInstructionFileAsync(options.InstructionFile);
 
-        // Process each output file
-        foreach (var outputFile in Directory.GetFiles(options.OutputDir, "*.out"))
+        // Get all output files and find most recent write time
+        string[] outputFiles = Directory.GetFiles(options.OutputDir, "*.out");
+        if (outputFiles.Length == 0)
+            return;
+
+        DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
+
+        // Process each output file, skipping stale ones
+        foreach (string outputFile in outputFiles)
         {
-            var variableName = Path.GetFileNameWithoutExtension(outputFile);
+            if (IsStaleFile(outputFile, mostRecentWriteTime))
+            {
+                EmitStaleFileWarning(outputFile, mostRecentWriteTime);
+                continue;
+            }
+
+            string variableName = Path.GetFileNameWithoutExtension(outputFile);
             await ImportOutputFile(
                 outputFile,
                 variableName,
@@ -60,25 +131,39 @@ public class ImportHandler
 
     public async Task HandleSiteImport(SiteOptions options)
     {
-        // Find all site-level runs
-        var runs = _gitService.FindSiteLevelRuns(options.RepoPath).ToList();
-        if (!runs.Any())
-        {
-            throw new InvalidOperationException("No site-level runs found in repository");
-        }
+        using var _ = _logger.BeginScope("importer");
 
-        foreach (var (siteName, instructionFile, outputDir) in runs)
+        // Find all site-level runs
+        IEnumerable<(string, string, string)> runs = _gitService.FindSiteLevelRuns(options.RepoPath).ToList();
+        if (!runs.Any())
+            throw new InvalidOperationException("No site-level runs found in repository");
+
+        foreach ((string siteName, string instructionFile, string outputDir) in runs)
         {
             // Get repository info
-            var repoInfo = _gitService.GetRepositoryInfo(instructionFile, options.RepoPath);
+            GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(instructionFile, options.RepoPath);
 
             // Parse instruction file
-            var parameters = await _instructionParser.ParseInstructionFileAsync(instructionFile);
+            string parameters = await _instructionParser.ParseInstructionFileAsync(instructionFile);
 
-            // Process each output file
-            foreach (var outputFile in Directory.GetFiles(outputDir, "*.out"))
+            // Get all output files and find most recent write time
+            string[] outputFiles = Directory.GetFiles(outputDir, "*.out");
+            if (outputFiles.Length == 0)
+                continue;
+
+            DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
+
+            // Process each output file, skipping stale ones
+            foreach (string outputFile in outputFiles)
             {
-                var variableName = Path.GetFileNameWithoutExtension(outputFile);
+                if (IsStaleFile(outputFile, mostRecentWriteTime))
+                {
+                    EmitStaleFileWarning(outputFile, mostRecentWriteTime);
+                    continue;
+                }
+
+
+                string variableName = Path.GetFileNameWithoutExtension(outputFile);
                 await ImportOutputFile(
                     outputFile,
                     variableName,
@@ -107,7 +192,7 @@ public class ImportHandler
         // Parse output file
         Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);
 
-        var request = new ImportModelPredictionRequest
+        ImportModelPredictionRequest request = new()
         {
             Name = name,
             Description = description,
@@ -120,7 +205,19 @@ public class ImportHandler
             Quantity = quantity
         };
 
-        var response = await _httpClient.PostAsJsonAsync("api/predictions/import", request);
+        _logger.LogDebug("Sending request to: {Uri}", _httpClient.BaseAddress != null 
+            ? new Uri(_httpClient.BaseAddress, endpoint).ToString()
+            : endpoint);
+
+        HttpResponseMessage response = await _httpClient.PostAsJsonAsync(endpoint, request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("Failed to import predictions. Status code: {StatusCode}, Reason: {ReasonPhrase}", 
+                response.StatusCode, 
+                response.ReasonPhrase);
+        }
+
         response.EnsureSuccessStatusCode();
     }
 }

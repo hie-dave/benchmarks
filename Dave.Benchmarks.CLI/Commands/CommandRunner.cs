@@ -14,11 +14,12 @@ public class CommandRunner
         _logger = logger;
     }
 
-    public async Task<int> RunAsync<T>(Func<T, Task> action)
+    public async Task<int> RunAsync<T>(Func<T, Task> action) where T : notnull
     {
         try
         {
-            var handler = ActivatorUtilities.CreateInstance<T>(_services);
+            // Get the handler from the DI container instead of creating it manually
+            T handler = _services.GetRequiredService<T>();
             await action(handler);
             return 0;
         }

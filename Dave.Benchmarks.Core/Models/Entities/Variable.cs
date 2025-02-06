@@ -1,5 +1,8 @@
-namespace Dave.Benchmarks.Core.Models;
+namespace Dave.Benchmarks.Core.Models.Entities;
 
+/// <summary>
+/// Represents a variable in a dataset, containing metadata about the measurements.
+/// </summary>
 public class Variable
 {
     public int Id { get; set; }
@@ -10,5 +13,5 @@ public class Variable
     // Navigation properties
     public int DatasetId { get; set; }
     public Dataset Dataset { get; set; } = null!;
-    public ICollection<DataPoint> DataPoints { get; set; } = new List<DataPoint>();
+    public ICollection<Datum> Data { get; set; } = new List<Datum>();
 }

@@ -1,8 +1,11 @@
 using System;
 using Dave.Benchmarks.Core.Utilities;
 
-namespace Dave.Benchmarks.Core.Models;
+namespace Dave.Benchmarks.Core.Models.Entities;
 
+/// <summary>
+/// Represents a dataset containing model predictions.
+/// </summary>
 public class ModelPredictionDataset : Dataset
 {
     // Required for reproducibility

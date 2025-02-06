@@ -9,13 +9,13 @@ namespace Dave.Benchmarks.Web.Controllers;
 /// </summary>
 public class DiagnosticsController : Controller
 {
-    private readonly BenchmarksContext context;
+    private readonly BenchmarksDbContext context;
 
     /// <summary>
     /// Initializes a new instance of the DiagnosticsController.
     /// </summary>
     /// <param name="context">The database context.</param>
-    public DiagnosticsController(BenchmarksContext context)
+    public DiagnosticsController(BenchmarksDbContext context)
     {
         this.context = context;
     }
