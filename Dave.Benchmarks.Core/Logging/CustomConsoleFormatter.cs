@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 
-namespace Dave.Benchmarks.CLI.Logging;
+namespace Dave.Benchmarks.Core.Logging;
 
 public class CustomConsoleFormatter : ConsoleFormatter
 {

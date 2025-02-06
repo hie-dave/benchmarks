@@ -1,9 +1,9 @@
 using CommandLine;
 using Dave.Benchmarks.CLI.Commands;
 using Dave.Benchmarks.CLI.Configuration;
-using Dave.Benchmarks.CLI.Logging;
 using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
+using Dave.Benchmarks.Core.Logging;
 using Dave.Benchmarks.Core.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,24 +31,12 @@ builder.Services.AddTransient<ImportHandler>();
 
 builder.Services.AddHttpClient<ImportHandler>((sp, client) =>
 {
-    var settings = sp.GetRequiredService<ApiSettings>();
+    ApiSettings settings = sp.GetRequiredService<ApiSettings>();
     client.BaseAddress = new Uri(settings.WebApiUrl);
 });
 
 // Configure logging
-builder.Logging.ClearProviders();
-builder.Services.AddLogging(logging =>
-{
-    logging.AddConsole(options =>
-    {
-        options.FormatterName = CustomConsoleFormatterOptions.FormatterName;
-    });
-    logging.AddConsoleFormatter<CustomConsoleFormatter, CustomConsoleFormatterOptions>(options =>
-    {
-        options.TimestampFormat = "HH:mm:ss ";
-        options.IncludeScopes = true;
-    });
-});
+builder.Services.ConfigureLogging();
 
 IHost host = builder.Build();
 

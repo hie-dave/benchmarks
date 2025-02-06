@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Dave.Benchmarks.Core.Logging;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Configure logging
+builder.Services.ConfigureLogging();
 
 // Add database context
 builder.Services.AddDbContext<Dave.Benchmarks.Core.Data.BenchmarksDbContext>(options =>
