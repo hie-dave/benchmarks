@@ -177,6 +177,17 @@ public class ImportHandler
         }
     }
 
+    /// <summary>
+    /// Imports a single output file and uploads it to the DB.
+    /// </summary>
+    /// <param name="outputFile">Path to the output file.</param>
+    /// <param name="name">Name of the quantity.</param>
+    /// <param name="description">Description of the quantity.</param>
+    /// <param name="parameters">Parameters used to run the model.</param>
+    /// <param name="repoInfo">Information about the repository.</param>
+    /// <param name="climateDataset">Climate dataset used in the run.</param>
+    /// <param name="spatialResolution">Spatial resolution of the run.</param>
+    /// <param name="temporalResolution">Temporal resolution of the run.</param>
     private async Task ImportOutputFile(
         string outputFile,
         string name,
