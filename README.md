@@ -78,6 +78,12 @@ cd Dave.Benchmarks.Web
 dotnet run
 ```
 
+5. Test the database connection:
+
+```bash
+curl http://localhost:5069/api/diagnostics/db
+```
+
 ## Database Management
 
 ### Starting/Stopping MariaDB

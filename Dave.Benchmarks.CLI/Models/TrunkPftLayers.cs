@@ -1,14 +1,14 @@
 namespace Dave.Benchmarks.CLI.Models;
 
 /// <summary>
-/// Represents layer metadata for output files which contain data for each PFT.
-/// In these files, all data layers have the same units.
+/// Represents layer metadata for trunk output files which contain data for each
+/// PFT. In these files, all data layers have the same units.
 /// </summary>
-public class PftLayers : ILayerDefinitions
+public class TrunkPftLayers : ILayerDefinitions
 {
     private readonly Unit units;
 
-    public PftLayers(Unit units)
+    public TrunkPftLayers(Unit units)
     {
         this.units = units;
     }
@@ -27,6 +27,6 @@ public class PftLayers : ILayerDefinitions
 
     public bool IsDataLayer(string layer)
     {
-        return !ModelConstants.DaveMetadataLayers.Contains(layer);
+        return !ModelConstants.TrunkMetadataLayers.Contains(layer);
     }
 }
