@@ -213,7 +213,7 @@ public class ModelOutputParser
             // Stand is optional and will not be written if only one stand is
             // present.
             standId = 0;
-            if (indices.TryGetValue("Stand", out int standIndex))
+            if (indices.TryGetValue(ModelConstants.StandLayer, out int standIndex))
             {
                 if (!int.TryParse(values[standIndex], out int stand))
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid stand value: {values[standIndex]}");
@@ -222,7 +222,7 @@ public class ModelOutputParser
 
             if (metadata.Level >= AggregationLevel.Patch)
             {
-                if (!indices.TryGetValue("Patch", out int patchIndex))
+                if (!indices.TryGetValue(ModelConstants.PatchLayer, out int patchIndex))
                     ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Patch");
                 if (!int.TryParse(values[patchIndex], out int patch))
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid patch value: {values[patchIndex]}");
@@ -230,7 +230,7 @@ public class ModelOutputParser
 
                 if (metadata.Level == AggregationLevel.Individual)
                 {
-                    if (!indices.TryGetValue("Individual", out int individualIndex))
+                    if (!indices.TryGetValue(ModelConstants.IndivLayer, out int individualIndex))
                         ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Individual");
                     if (!int.TryParse(values[individualIndex], out int individual))
                         ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid individual value: {values[individualIndex]}");

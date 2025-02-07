@@ -161,7 +161,7 @@ public class ImportHandler
         };
 
         string endpoint = string.Format(addEndpoint, datasetId);
-        var response = await _httpClient.PostAsJsonAsync(endpoint, request);
+        var response = await _httpClient.PostAsJsonAsync(endpoint, quantity);
         response.EnsureSuccessStatusCode();
     }
 

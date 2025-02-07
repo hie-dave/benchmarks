@@ -47,9 +47,6 @@ public class DynamicLayers : ILayerDefinitions
         if (!IsDataLayer(layer))
             throw new InvalidOperationException($"Layer {layer} is not a data layer");
 
-        if (!dataLayers.Contains(layer))
-            throw new InvalidOperationException($"Layer {layer} is invalid or has not been discovered yet");
-
         return units;
     }
 
