@@ -220,6 +220,7 @@ public class ImportHandler
             ? new Uri(_httpClient.BaseAddress, endpoint).ToString()
             : endpoint);
 
+        return;
         HttpResponseMessage response = await _httpClient.PostAsJsonAsync(endpoint, request);
 
         if (!response.IsSuccessStatusCode)

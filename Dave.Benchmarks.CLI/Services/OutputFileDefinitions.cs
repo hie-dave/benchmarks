@@ -35,6 +35,7 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "dave_alpha_root", "Root Sink Strength", "Daily root sink strength", "0-1");
         AddPftOutput(builder, "dave_alpha_sap", "Sap Sink Strength", "Daily sap sink strength", "0-1");
         AddPftOutput(builder, "dave_alpha_repr", "Reproductive Sink Strength", "Daily reproductive sink strength", "0-1");
+        AddPftOutput(builder, "dave_cmass", "Vegetation Carbon Mass", "Daily PFT-level carbon mass", "kgC/m2");
         AddPftOutput(builder, "dave_cmass_leaf_limit", "Leaf Pool Size", "Daily optimum leaf pool size for trees", "kgC/m2");
         AddPftOutput(builder, "dave_cmass_root_limit", "Root Pool Size", "Daily optimum root pool size for trees", "kgC/m2");
         AddPftOutput(builder, "dave_cmass_sap_limit", "Sap Pool Size", "Daily optimum sap pool size for trees", "kgC/m2");
@@ -67,6 +68,56 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "dave_aboveground_nmass", "Above-ground N Mass", "Daily above-ground N biomass", "kgN/m2");
         AddPftOutput(builder, "dave_belowground_nmass", "Below-ground N Mass", "Daily below-ground N biomass", "kgN/m2");
         AddPftOutput(builder, "dave_indiv_npp", "Individual NPP", "Daily NPP", "gC/m2/day");
+        AddPftOutput(builder, "dave_sla", "Specific Leaf Area", "Daily specific leaf area", "m2/kgC");
+        AddPftOutput(builder, "dave_cmass_leaf_brown", "Brown Leaf C Mass", "Daily brown leaf carbon mass", "kgC/m2");
+        AddPftOutput(builder, "dave_nmass_leaf", "Leaf N Mass", "Daily leaf nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_cmass_crown", "Crown C Mass", "Daily crown carbon mass", "kgC/m2");
+        AddPftOutput(builder, "dave_nmass_root", "Root N Mass", "Daily root nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_nmass", "Vegetation Nitrogen Mass", "Daily PFT-level total nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_cmass_storage_max", "Max Storage C Mass", "Daily maximum storage carbon mass", "kgC/m2");
+        AddPftOutput(builder, "dave_nmass_storage", "Storage N Mass", "Daily storage nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_nmass_storage_max", "Max Storage N Mass", "Daily maximum storage nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_nmass_sap", "Sap N Mass", "Daily sapwood nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_cmass_heart", "Heart C Mass", "Daily heartwood carbon mass", "kgC/m2");
+        AddPftOutput(builder, "dave_nmass_heart", "Heart N Mass", "Daily heartwood nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_nmass_repr", "Reproductive N Mass", "Daily reproductive nitrogen mass", "kgN/m2");
+        AddPftOutput(builder, "dave_ndemand", "N Demand", "Daily nitrogen demand", "kgN/m2/day");
+        AddPftOutput(builder, "dave_density", "Density", "Daily individual density", "indiv/m2");
+        AddPftOutput(builder, "dave_sapwood_area", "Sapwood Area", "Daily sapwood area", "m2");
+        AddPftOutput(builder, "dave_latosa", "Leaf to Sapwood Area", "Daily leaf to sapwood area ratio", "");
+        AddPftOutput(builder, "dave_fpar", "FPAR", "Daily fraction of absorbed PAR", "0-1");
+        AddPftOutput(builder, "dave_indiv_gpp", "Individual GPP", "Daily individual gross primary production", "gC/m2/day");
+        AddPftOutput(builder, "dave_resp_autotrophic", "Autotrophic Respiration", "Daily autotrophic respiration", "gC/m2/day");
+        AddPftOutput(builder, "dave_resp_maintenance", "Maintenance Respiration", "Daily maintenance respiration", "gC/m2/day");
+        AddPftOutput(builder, "dave_resp_growth", "Growth Respiration", "Daily growth respiration", "gC/m2/day");
+        AddPftOutput(builder, "dave_layerwise_fpar", "Layerwise FPAR", "Daily layerwise fraction of absorbed PAR", "0-1");
+        AddPftOutput(builder, "dave_layerwise_lai", "Layerwise LAI", "Daily layerwise leaf area index", "m2/m2");
+        AddPftOutput(builder, "dave_wscal", "Water Stress", "Daily water stress scalar", "0-1");
+        AddPftOutput(builder, "dave_cmass_litter_repr", "Reproductive C Litter", "Daily reproductive carbon litter", "kgC/m2");
+        AddPftOutput(builder, "dave_nmass_litter_repr", "Reproductive N Litter", "Daily reproductive nitrogen litter", "kgN/m2");
+        AddPftOutput(builder, "dave_dresp", "Daily Respiration", "Daily total respiration", "gC/m2/day");
+        AddPftOutput(builder, "dave_cmass_seed_ext", "External Seed C Mass", "Daily external seed carbon mass", "kgC/m2");
+        AddPftOutput(builder, "dave_subdaily_an", "Subdaily Net Photosynthesis", "Subdaily net photosynthesis", "gC/m2/h");
+        AddPftOutput(builder, "dave_subdaily_rd", "Subdaily Dark Respiration", "Subdaily dark respiration", "gC/m2/h");
+        AddPftOutput(builder, "dave_subdaily_anc", "Subdaily Net C-limited Photosynthesis", "Subdaily net C-limited photosynthesis", "gC/m2/h");
+        AddPftOutput(builder, "dave_subdaily_anj", "Subdaily Net Light-limited Photosynthesis", "Subdaily net light-limited photosynthesis", "gC/m2/h");
+        AddPftOutput(builder, "dave_subdaily_gsw", "Subdaily Stomatal Conductance", "Subdaily stomatal conductance", "mm/s");
+        AddPftOutput(builder, "dave_subdaily_ci", "Subdaily Internal CO2", "Subdaily internal CO2 concentration", "ppm");
+        AddPftOutput(builder, "dave_subdaily_vcmax", "Subdaily Vcmax", "Subdaily maximum carboxylation rate", "μmol/m2/s");
+        AddPftOutput(builder, "dave_subdaily_jmax", "Subdaily Jmax", "Subdaily maximum electron transport rate", "μmol/m2/s");
+        AddPftOutput(builder, "dave_sw", "Soil Water", "Daily soil water content", "mm");
+        AddPftOutput(builder, "dave_swmm", "Soil Water mm", "Daily soil water content in mm", "mm");
+        AddPftOutput(builder, "dave_swvol", "Soil Water Volume", "Daily soil water content as volume fraction", "0-1");
+        AddPftOutput(builder, "dave_cfluxes_patch", "Patch C Fluxes", "Daily patch-level carbon fluxes", "gC/m2/day");
+        AddPftOutput(builder, "dave_cfluxes_pft", "PFT C Fluxes", "Daily PFT-level carbon fluxes", "gC/m2/day");
+        AddPftOutput(builder, "dave_met_subdaily_temp", "Subdaily Temperature", "Subdaily temperature", "°C");
+        AddPftOutput(builder, "dave_met_subdaily_par", "Subdaily PAR", "Subdaily photosynthetically active radiation", "W/m2");
+        AddPftOutput(builder, "dave_met_subdaily_vpd", "Subdaily VPD", "Subdaily vapor pressure deficit", "kPa");
+        AddPftOutput(builder, "dave_met_subdaily_insol", "Subdaily Insolation", "Subdaily insolation", "W/m2");
+        AddPftOutput(builder, "dave_met_subdaily_precip", "Subdaily Precipitation", "Subdaily precipitation", "mm/h");
+        AddPftOutput(builder, "dave_met_subdaily_pressure", "Subdaily Pressure", "Subdaily atmospheric pressure", "kPa");
+        AddPftOutput(builder, "dave_met_subdaily_co", "Subdaily CO2", "Subdaily atmospheric CO2 concentration", "ppm");
+        AddPftOutput(builder, "dave_anetps_ff_max", "Max Forest Floor Net Photosynthesis", "Maximum daily forest floor net photosynthesis", "gC/m2/day");
 
         // Daily individual-level outputs.
         AddIndivOutput(builder, "dave_indiv_cpool", "Individual Carbon Pools", "Individual-level carbon pools", "kgC/m2", ["cmass_leaf", "cmass_root", "cmass_crown", "cmass_sap", "cmass_heart", "cmass_repr", "cmass_storage"]);
@@ -76,6 +127,9 @@ public static class OutputFileDefinitions
         // Patch-level outputs
         AddPatchOutput(builder, "dave_patch_age", "Patch Age", "Annual patch-level age since last disturbance (years)", "years", ["age"]);
         AddPatchOutput(builder, "dave_arunoff", "Annual Runoff", "Annual runoff (mm)", "mm", ["runoff"]);
+        AddPatchOutput(builder, "dave_globfirm", "Globfirm outputs", "Annual GLOBFIRM Outputs", [
+            ("fireprob", "0-1")
+        ]);
 
         // Carbon pools
         AddPatchOutput(builder, "dave_acpool", "Annual Carbon Pools", "Annual C pools (kgC/m2)", "kgC/m2", [
@@ -109,10 +163,10 @@ public static class OutputFileDefinitions
         AddPatchOutput(builder, "dave_apet", "Annual Potential Evapotranspiration", "Annual potential patch-level evapotranspiration (mm)", "mm", ["pet"]);
 
         // Fire-related outputs
-        AddPatchOutput(builder, "dave_asimfire", "Annual Simfire Analysis", "Annual simfire analysis", new[] { 
+        AddPatchOutput(builder, "dave_asimfire", "Annual Simfire Analysis", "Annual simfire analysis", [
             ("burned_area", "fraction"),
             ("fire_carbon", "gC/m2") 
-        });
+        ]);
 
         AddPatchOutput(builder, "dave_afuel", "Annual Fuel Availability", "Annual blaze fuel availability (gC/m2)", "gC/m2", ["fuel"]);
 
@@ -162,22 +216,37 @@ public static class OutputFileDefinitions
             "total"
         ]);
 
-        AddPatchOutput(builder, "dave_anfixation", "Annual N Fixation", "Total annual biological N fixation (kgN/m2)", "kgN/m2", ["nfixation"]);
+        AddPatchOutput(builder, "dave_anfixation", "Annual N Fixation", "Total annual biological N fixation (kgN/m2)", "kgN/m2", [
+            "nfixation"
+        ]);
 
         // Daily patch-level outputs
         AddPatchOutput(builder, "dave_daylength", "Daylength", "Daily patch-level day-length (h)", "h", ["daylength"]);
         AddPatchOutput(builder, "dave_soil_nmass_avail", "Available Soil N", "Available Soil N for plant uptake (kgN/m2)", "kgN/m2", ["soil_nmass_avail"]);
-        AddPatchOutput(builder, "dave_dsimfire", "Daily Simfire Analysis", "Daily simfire analysis", new[] { 
+        AddPatchOutput(builder, "dave_dsimfire", "Daily Simfire Analysis", "Daily simfire analysis", [
             ("burned_area", "fraction"),
             ("fire_carbon", "gC/m2") 
-        });
+        ]);
 
+        AddPatchOutput(builder, "dave_met_pressure", "Met Pressure", "Daily atmospheric pressure", "kPa", ["pressure"]);
+        AddPatchOutput(builder, "dave_met_co2", "Met CO2", "Daily atmospheric CO2 concentration", "ppm", ["co2"]);
+        AddPatchOutput(builder, "dave_sompool_cmass", "SOM Pool C Mass", "Daily SOM pool C mass", "kgC/m2", ["cmass"]);
+        AddPatchOutput(builder, "dave_sompool_nmass", "SOM Pool N Mass", "Daily SOM pool N mass", "kgN/m2", ["nmass"]);
+        AddPatchOutput(builder, "dave_ninput", "N Input", "Daily nitrogen input", "kgN/m2/day", ["ninput"]);
+        AddPatchOutput(builder, "dave_fpar_ff", "Forest Floor FPAR", "Daily forest floor FPAR", "0-1", ["fpar_ff"]);
+        AddPatchOutput(builder, "dave_resp_heterotrophic", "Heterotrophic Respiration", "Daily heterotrophic respiration", "gC/m2/day", ["resp_h"]);
+        AddPatchOutput(builder, "dave_resp", "Total Respiration", "Daily total respiration", "gC/m2/day", ["resp"]);
+        AddPatchOutput(builder, "dave_gpp", "GPP", "Daily gross primary production", "gC/m2/day", ["gpp"]);
+        AddPatchOutput(builder, "dave_npp", "NPP", "Daily net primary production", "gC/m2/day", ["npp"]);
+        AddPatchOutput(builder, "dave_nee", "NEE", "Daily net ecosystem exchange", "gC/m2/day", ["nee"]);
+        AddPatchOutput(builder, "dave_evaporation", "Evaporation", "Daily evaporation", "mm/day", ["evap"]);
+        AddPatchOutput(builder, "dave_soilc", "Soil Carbon", "Daily soil carbon content", "kgC/m2", ["soilc"]);
+        AddPatchOutput(builder, "dave_soiln", "Soil Nitrogen", "Daily soil nitrogen content", "kgN/m2", ["soiln"]);
+        AddPatchOutput(builder, "dave_soil_nflux", "Soil N Flux", "Daily soil nitrogen flux", "kgN/m2/day", ["nflux"]);
         AddPatchOutput(builder, "dave_dfuel", "Daily Fuel Availability", "Daily blaze fuel availability (kgC/m2)", "kgC/m2", ["fuel"]);
-
         AddPatchOutput(builder, "dave_dcoarse_woody_debris", "Daily Coarse Woody Debris", "Daily coarse woody debris (gC/m2)", "gC/m2", ["cwd"]);
-
         AddPatchOutput(builder, "dave_met_temp", "Temperature", "Daily air temperature (°C)", "°C", ["temp"]);
-        AddPatchOutput(builder, "dave_met_par", "PAR", "Daily PAR (J/m2/timestep)", "J/m2/timestep", ["par"]);
+        AddPatchOutput(builder, "dave_met_par", "PAR", "Daily PAR (J/m2/timestep)", "kJ/m2/timestep", ["par"]);
         AddPatchOutput(builder, "dave_met_vpd", "VPD", "Daily VPD (kPa)", "kPa", ["vpd"]);
         AddPatchOutput(builder, "dave_met_insol", "Insolation", "Daily insolation", "", ["insol"]);
         AddPatchOutput(builder, "dave_met_precip", "Precipitation", "Daily total precipitation (mm)", "mm", ["precip"]);
@@ -224,7 +293,7 @@ public static class OutputFileDefinitions
         AddTrunkPftOutput(builder, "fpc", "Foliage Projective Cover", "Foliage Projective Cover (fraction)", "0-1");
         AddTrunkPftOutput(builder, "aaet", "Annual AET", "Annual Actual Evapotranspiration (mm/year)", "mm/year");
         AddTrunkPftOutput(builder, "lai", "Leaf Area Index", "Leaf Area Index (m2/m2)", "m2/m2");
-        AddTrunkOutput(builder, "cflux", "Carbon Fluxes", "Annual carbon fluxes (kgC/m2/year)", "kgC/m2/year", [
+        AddTrunkOutput(builder, "cflux", "Carbon Fluxes", "Annual carbon fluxes (kgC/m2/year)", "kgC/m2/year", new[] {
            "Veg",
             "Repr",
             "Soil",
@@ -235,28 +304,30 @@ public static class OutputFileDefinitions
             "LU_ch",
             "Slow_h",
             "NEE"
-        ]);
+        });
 
         AddTrunkPftOutput(builder, "doc", "Dissolved Organic Carbon", "Dissolved organic carbon (kgC/m2)", "kgC/m2");
         AddTrunkPftOutput(builder, "dens", "Tree Density", "Tree density (indiv/m2)", "indiv/m2");
 
-        AddTrunkOutput(builder, "cpool", "Carbon Pools", "Soil carbon pools (kgC/m2)", "kgC/m2", [
+        AddTrunkOutput(builder, "cpool", "Carbon Pools", "Soil carbon pools (kgC/m2)", "kgC/m2", new[] {
             "VegC",
             "LitterC",
             "SoilC",
             "Total"
-        ]);
+        });
 
         AddTrunkPftOutput(builder, "clitter", "Carbon Litter", "Carbon in litter (kgC/m2)", "kgC/m2");
 
-        AddTrunkOutput(builder, "tot_runoff", "Runoff", "Total runoff (mm/year)", "mm/year", [
+        AddTrunkOutput(builder, "tot_runoff", "Runoff", "Total runoff (mm/year)", "mm/year", new[] {
             "Surf",
             "Drain",
             "Base",
-            "Total"]);
+            "Total"});
 
         AddTrunkOutput(builder, "wetland_water_added", "Wetland Water Added", "Water added to wetland (mm)", "mm", ["H2OAdded"]);
-        AddTrunkOutput(builder, "firert", "Fire Return Time", "Fire return time (years)", [
+        AddTrunkPftOutput(builder, "height", "Species Height", "Mean Species Height", "m");
+        AddTrunkPftOutput(builder, "file_speciesdiam", "Species Diameter", "Mean species diameter", "m");
+        AddTrunkOutput(builder, "firert", "Fire Return Time", "Fire return time", [
             ("FireRT", "years"),
             ("BurntFr", "0-1")]);
 
@@ -381,7 +452,7 @@ public static class OutputFileDefinitions
             fileName: fileType,
             name: name,
             description: description,
-            layers: new IndividualLayers(layers, new Unit(units))));
+            layers: new IndividualLayers(layers.Select(l => (l, new Unit(units))).ToArray())));
     }
 
     /// <summary>
