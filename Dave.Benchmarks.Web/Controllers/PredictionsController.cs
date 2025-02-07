@@ -34,7 +34,7 @@ public class PredictionsController : ControllerBase
     {
         _logger.LogInformation("Importing model prediction: {Name}", request.Name);
 
-        var dataset = new ModelPredictionDataset
+        var dataset = new PredictionDataset
         {
             Name = request.Name,
             Description = request.Description,

@@ -14,7 +14,7 @@ public class BenchmarksDbContext : DbContext
     }
 
     public DbSet<Dataset> Datasets { get; set; } = null!;
-    public DbSet<ModelPredictionDataset> ModelPredictions { get; set; } = null!;
+    public DbSet<PredictionDataset> ModelPredictions { get; set; } = null!;
     public DbSet<ObservationDataset> Observations { get; set; } = null!;
     public DbSet<Variable> Variables { get; set; } = null!;
     public DbSet<Datum> MeasurementPoints { get; set; } = null!;
@@ -60,7 +60,7 @@ public class BenchmarksDbContext : DbContext
         modelBuilder.Entity<Variable>()
             .ToTable("Variables");
 
-        modelBuilder.Entity<ModelPredictionDataset>()
+        modelBuilder.Entity<PredictionDataset>()
             .ToTable("Predictions");
 
         modelBuilder.Entity<ObservationDataset>()

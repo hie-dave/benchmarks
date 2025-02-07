@@ -6,7 +6,7 @@ namespace Dave.Benchmarks.Core.Models.Entities;
 /// <summary>
 /// Represents a dataset containing model predictions.
 /// </summary>
-public class ModelPredictionDataset : Dataset
+public class PredictionDataset : Dataset
 {
     // Required for reproducibility
     public string ModelVersion { get; set; } = string.Empty;        // Git hash or version number
