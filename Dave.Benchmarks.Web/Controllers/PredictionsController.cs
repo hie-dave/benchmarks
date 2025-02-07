@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Dave.Benchmarks.Web.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class PredictionsController : ControllerBase
 {
     private readonly BenchmarksDbContext _dbContext;
@@ -22,10 +22,10 @@ public class PredictionsController : ControllerBase
         this.logger = logger;
     }
 
-    [HttpPost]
-    public async Task<ActionResult<Dataset>> Create([FromBody] CreateDatasetRequest request)
+    [HttpPost("create")]
+    public async Task<ActionResult<PredictionDataset>> Create([FromBody] CreateDatasetRequest request)
     {
-        var dataset = new Dataset
+        var dataset = new PredictionDataset
         {
             Name = request.Name,
             Description = request.Description,
@@ -34,8 +34,8 @@ public class PredictionsController : ControllerBase
             ClimateDataset = request.ClimateDataset,
             SpatialResolution = request.SpatialResolution,
             TemporalResolution = request.TemporalResolution,
-            CompressedParameters = request.CompressedParameters,
-            CompressedCodePatches = request.CompressedCodePatches
+            Parameters = request.CompressedParameters,
+            Patches = request.CompressedCodePatches
         };
 
         _dbContext.Datasets.Add(dataset);
@@ -44,7 +44,7 @@ public class PredictionsController : ControllerBase
         return Ok(dataset);
     }
 
-    [HttpPost("{datasetId}/quantities")]
+    [HttpPost("{datasetId}/add")]
     public async Task<ActionResult> AddQuantity(int datasetId, [FromBody] Quantity quantity)
     {
         var dataset = await _dbContext.Datasets

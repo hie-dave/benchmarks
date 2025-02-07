@@ -1,3 +1,4 @@
+@using Dave.Benchmarks.Core.Models.Entities
 @model IEnumerable<Dave.Benchmarks.Core.Models.Entities.Dataset>
 
 @{
@@ -19,13 +20,42 @@
                         {
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0">@dataset.Name</h6>
+                                    <div>
+                                        <h6 class="mb-0">@dataset.Name</h6>
+                                        <small class="text-muted">
+                                            @(dataset is PredictionDataset ? "Prediction" : "Observation")
+                                        </small>
+                                    </div>
                                     <button class="btn btn-danger btn-sm delete-dataset" 
                                             data-dataset-id="@dataset.Id" 
                                             data-dataset-name="@dataset.Name">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
+                                
+                                <div class="mb-2">
+                                    <small class="text-muted">Created: @dataset.CreatedAt.ToString("g")</small><br/>
+                                    @if (!string.IsNullOrEmpty(dataset.Description))
+                                    {
+                                        <small>@dataset.Description</small>
+                                    }
+                                    
+                                    @if (dataset is PredictionDataset pred)
+                                    {
+                                        <div class="mt-1">
+                                            <small class="text-muted">Model Version: @pred.ModelVersion</small><br/>
+                                            <small class="text-muted">Climate Data: @pred.ClimateDataset</small>
+                                        </div>
+                                    }
+                                    else if (dataset is ObservationDataset obs)
+                                    {
+                                        <div class="mt-1">
+                                            <small class="text-muted">Source: @obs.Source</small><br/>
+                                            <small class="text-muted">Version: @obs.Version</small>
+                                        </div>
+                                    }
+                                </div>
+
                                 <select class="form-select variable-select" data-dataset-id="@dataset.Id">
                                     <option value="">All Variables</option>
                                     @foreach (var variable in dataset.Variables)
@@ -50,9 +80,9 @@
                             <tr>
                                 <th>Timestamp</th>
                                 <th>Variable</th>
-                                <th>Latitude</th>
-                                <th>Longitude</th>
+                                <th>Layer</th>
                                 <th>Value</th>
+                                <th>Location</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -96,9 +126,9 @@
                 columns: [
                     { data: 'timestamp' },
                     { data: 'variableName' },
-                    { data: 'latitude' },
-                    { data: 'longitude' },
-                    { data: 'value' }
+                    { data: 'layer' },
+                    { data: 'value' },
+                    { data: 'location' }
                 ],
                 order: [[0, 'asc']],
                 pageLength: 25
@@ -108,7 +138,12 @@
                 let datasetId = $(this).data('dataset-id');
                 let variableId = $(this).val();
                 
-                $.get(`/Data/GetDatasetData?datasetId=${datasetId}&variableId=${variableId}`)
+                if (!variableId) {
+                    table.clear().draw();
+                    return;
+                }
+                
+                $.get(`/api/data/datasets/${datasetId}/variables/${variableId}/data`)
                     .done(function(data) {
                         table.clear();
                         table.rows.add(data);
@@ -133,32 +168,35 @@
             $('#confirmDelete').click(function() {
                 if (!datasetIdToDelete) return;
 
-                $.post(`/Data/DeleteDataset/${datasetIdToDelete}`)
-                    .done(function(response) {
-                        if (response.success) {
-                            // Remove the dataset from the UI
-                            $(`.list-group-item:has([data-dataset-id="${datasetIdToDelete}"])`).remove();
-                            
-                            // Clear the table if we were viewing this dataset
-                            if ($('.variable-select').length > 0) {
-                                $('.variable-select').first().trigger('change');
-                            } else {
-                                table.clear().draw();
-                            }
-
-                            // Show success message
-                            alert('Dataset deleted successfully');
+                $.ajax({
+                    url: `/api/data/datasets/${datasetIdToDelete}`,
+                    method: 'DELETE'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        // Remove the dataset from the UI
+                        $(`.list-group-item:has([data-dataset-id="${datasetIdToDelete}"])`).remove();
+                        
+                        // Clear the table if we were viewing this dataset
+                        if ($('.variable-select').length > 0) {
+                            $('.variable-select').first().trigger('change');
                         } else {
-                            alert(response.message || 'Failed to delete dataset');
+                            table.clear().draw();
                         }
-                    })
-                    .fail(function() {
-                        alert('Failed to delete dataset');
-                    })
-                    .always(function() {
-                        $('#deleteConfirmModal').modal('hide');
-                        datasetIdToDelete = null;
-                    });
+
+                        // Show success message
+                        alert('Dataset deleted successfully');
+                    } else {
+                        alert(response.message || 'Failed to delete dataset');
+                    }
+                })
+                .fail(function() {
+                    alert('Failed to delete dataset');
+                })
+                .always(function() {
+                    $('#deleteConfirmModal').modal('hide');
+                    datasetIdToDelete = null;
+                });
             });
         });
     </script>

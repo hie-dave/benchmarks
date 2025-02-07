@@ -25,7 +25,7 @@ public class ImportHandler
     /// <summary>
     /// API endpoint used to upload data to a dataset.
     /// </summary>
-    private const string addEndpoint = "api/predictions/add";
+    private const string addEndpoint = "api/predictions/{0}/add";
 
     /// <summary>
     /// API endpoint used to create a dataset.
@@ -160,7 +160,8 @@ public class ImportHandler
             Quantity = quantity
         };
 
-        var response = await _httpClient.PostAsJsonAsync(addEndpoint, request);
+        string endpoint = string.Format(addEndpoint, datasetId);
+        var response = await _httpClient.PostAsJsonAsync(endpoint, request);
         response.EnsureSuccessStatusCode();
     }
 

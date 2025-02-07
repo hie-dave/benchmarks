@@ -24,6 +24,13 @@ public class BenchmarksDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Configure dataset inheritance
+        modelBuilder.Entity<Dataset>()
+            .HasDiscriminator<string>("DatasetType")
+            .HasValue<PredictionDataset>("Prediction")
+            .HasValue<ObservationDataset>("Observation")
+            .IsComplete(true);  // Ensures only these two types are allowed
+
         // Configure relationships
         modelBuilder.Entity<Variable>()
             .HasMany(v => v.Layers)
