@@ -8,6 +8,7 @@ using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
+using Dave.Benchmarks.Core.Utilities;
 using Dave.Benchmarks.Core.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -132,8 +133,8 @@ public class ImportHandler
             ClimateDataset = climateDataset,
             SpatialResolution = spatialResolution,
             TemporalResolution = temporalResolution,
-            Parameters = parameters,
-            CodePatches = repoInfo.Patches
+            CompressedParameters = CompressionUtility.CompressText(parameters),
+            CompressedCodePatches = repoInfo.Patches
         };
 
         var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);

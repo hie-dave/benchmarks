@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Dave.Benchmarks.Core.Models.Entities;
 
 /// <summary>
@@ -9,9 +11,10 @@ public class Variable
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Units { get; set; } = string.Empty;
+    public AggregationLevel Level { get; set; }
     
     // Navigation properties
     public int DatasetId { get; set; }
     public Dataset Dataset { get; set; } = null!;
-    public ICollection<Datum> Data { get; set; } = new List<Datum>();
+    public ICollection<VariableLayer> Layers { get; set; } = new List<VariableLayer>();
 }

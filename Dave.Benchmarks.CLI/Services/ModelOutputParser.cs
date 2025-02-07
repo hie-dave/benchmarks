@@ -9,6 +9,10 @@ using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Utilities;
 using Microsoft.Extensions.Logging;
 
+using TemporalResolution = Dave.Benchmarks.Core.Models.Entities.TemporalResolution;
+using AggregationLevel = Dave.Benchmarks.Core.Models.Entities.AggregationLevel;
+using Dave.Benchmarks.Core.Utils;
+
 namespace Dave.Benchmarks.CLI.Services;
 
 /// <summary>
@@ -93,7 +97,7 @@ public class ModelOutputParser
                 ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid number of columns: has {values.Length} columns but header has {headers.Length}");
 
             // Parse required columns.
-            Coordinate point = ParseRequiredColumns(values, indices);
+            Coordinate point = ParseRequiredColumns(values, indices, metadata);
 
             // Parse data values for each series.
             logger.LogTrace("Parsing data values");
@@ -102,7 +106,24 @@ public class ModelOutputParser
                 if (!double.TryParse(values[indices[name]], out double value))
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid value: failed to parse double: {values[indices[name]]}");
 
-                seriesData[name].Add(new DataPoint(point.Timestamp, point.Lon, point.Lat, value));
+                // fixme
+                DateTime timestamp = point.Timestamp;
+                if (metadata.TemporalResolution == TemporalResolution.Monthly)
+                {
+                    int month = TimeUtils.GetMonth(name);
+
+                    // Last day of month.
+                    timestamp = new DateTime(point.Timestamp.Year, month, 1).AddMonths(1).AddDays(-1);
+                }
+
+                seriesData[name].Add(new DataPoint(
+                    timestamp,
+                    point.Lon,
+                    point.Lat,
+                    value,
+                    point.Stand,
+                    point.Patch,
+                    point.Individual));
             }
         }
 
@@ -113,7 +134,7 @@ public class ModelOutputParser
         foreach ((string name, List<DataPoint> points) in seriesData)
             layers.Add(new Layer(name, metadata.Layers.GetUnits(name), points));
 
-        return new Quantity(metadata.Name, metadata.Description, layers);
+        return new Quantity(metadata.Name, metadata.Description, layers, metadata.Level, metadata.TemporalResolution);
     }
 
     /// <summary>
@@ -145,43 +166,110 @@ public class ModelOutputParser
     /// <param name="Lon">Longitude in degrees.</param>
     /// <param name="Lat">Latitude in degrees.</param>
     /// <param name="Timestamp">Date/Time of the data point.</param>
-    private record Coordinate(double Lon, double Lat, DateTime Timestamp);
+    /// <param name="Stand">Stand ID, if applicable.</param>
+    /// <param name="Patch">Patch ID, if applicable.</param>
+    /// <param name="Individual">Individual ID, if applicable.</param>
+    private record Coordinate(
+        double Lon,
+        double Lat,
+        DateTime Timestamp,
+        int? Stand = null,
+        int? Patch = null,
+        int? Individual = null);
 
     /// <summary>
     /// Parse required columns from a row of an output file.
     /// </summary>
     /// <param name="values">The raw values from the row.</param>
     /// <param name="indices">The column indices for the required columns.</param>
+    /// <param name="metadata">Metadata about the output file.</param>
     /// <returns>A coordinate representing the location of the data point.</returns>
     /// <exception cref="InvalidDataException">Thrown if the required columns cannot be parsed or contain invalid values.</exception>
-    private Coordinate ParseRequiredColumns(string[] values, IReadOnlyDictionary<string, int> indices)
+    private Coordinate ParseRequiredColumns(string[] values, IReadOnlyDictionary<string, int> indices, OutputFileMetadata metadata)
     {
-        logger.LogTrace("Parsing coordinates");
-        if (!double.TryParse(values[indices[ModelConstants.LonLayer]], out var lon))
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[ModelConstants.LonLayer]]}");
+        if (!indices.TryGetValue("Lon", out int lonIndex))
+            ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Lon");
+        if (!indices.TryGetValue("Lat", out int latIndex))
+            ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Lat");
 
-        if (!double.TryParse(values[indices[ModelConstants.LatLayer]], out var lat))
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[ModelConstants.LatLayer]]}");
-
-        if (!int.TryParse(values[indices[ModelConstants.YearLayer]], out var year))
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid year: {values[indices[ModelConstants.YearLayer]]}");
-
-        // Default to last day of year.
-        int day = 364;
-        if (indices.TryGetValue(ModelConstants.DayLayer, out var dayIndex))
-            if (!int.TryParse(values[dayIndex], out day))
-                ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid day: {values[dayIndex]}");
+        if (!double.TryParse(values[lonIndex], out double lon))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude value: {values[lonIndex]}");
+        if (!double.TryParse(values[latIndex], out double lat))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude value: {values[latIndex]}");
 
         if (lon < 0 || lon > 360)
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude: {values[indices[ModelConstants.LonLayer]]}");
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid longitude value: {values[lonIndex]}");
 
-        if (lat < -90 || lat > 90)
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid latitude: {values[indices[ModelConstants.LatLayer]]}");
+        // Parse timestamp based on temporal resolution
+        DateTime timestamp = ParseTimestamp(values, indices, metadata.TemporalResolution);
 
-        if (day < 0 || day > 365)
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid day: {values[dayIndex]}");
+        // Parse additional IDs based on aggregation level
+        int? standId = null;
+        int? patchId = null;
+        int? individualId = null;
 
-        DateTime timestamp = new DateTime(year, 1, 1).AddDays(day);
-        return new Coordinate(lon, lat, timestamp);
+        if (metadata.Level >= AggregationLevel.Stand)
+        {
+            // Stand is optional and will not be written if only one stand is
+            // present.
+            standId = 0;
+            if (indices.TryGetValue("Stand", out int standIndex))
+            {
+                if (!int.TryParse(values[standIndex], out int stand))
+                    ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid stand value: {values[standIndex]}");
+                standId = stand;
+            }
+
+            if (metadata.Level >= AggregationLevel.Patch)
+            {
+                if (!indices.TryGetValue("Patch", out int patchIndex))
+                    ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Patch");
+                if (!int.TryParse(values[patchIndex], out int patch))
+                    ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid patch value: {values[patchIndex]}");
+                patchId = patch;
+
+                if (metadata.Level == AggregationLevel.Individual)
+                {
+                    if (!indices.TryGetValue("Individual", out int individualIndex))
+                        ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Individual");
+                    if (!int.TryParse(values[individualIndex], out int individual))
+                        ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid individual value: {values[individualIndex]}");
+                    individualId = individual;
+                }
+            }
+        }
+
+        return new Coordinate(lon, lat, timestamp, standId, patchId, individualId);
+    }
+
+    /// <summary>
+    /// Parse timestamp from a row based on temporal resolution.
+    /// </summary>
+    private DateTime ParseTimestamp(string[] values, IReadOnlyDictionary<string, int> indices, TemporalResolution resolution)
+    {
+        if (!indices.TryGetValue("Year", out int yearIndex))
+            ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Year");
+        if (!int.TryParse(values[yearIndex], out int year))
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid year value: {values[yearIndex]}");
+
+        if (resolution == TemporalResolution.Annual)
+            return new DateTime(year, 1, 1).AddDays(364); // Not always end of year!
+
+        if (resolution == TemporalResolution.Daily)
+        {
+            if (!indices.TryGetValue("Day", out int dayIndex))
+                ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Day");
+            if (!int.TryParse(values[dayIndex], out int day))
+                ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid day value: {values[dayIndex]}");
+
+            // Day is 0-indexed.
+            return new DateTime(year, 1, 1).AddDays(day);
+        }
+
+        if (resolution != TemporalResolution.Monthly)
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"Unexpected temporal resolution: {resolution}");
+
+        // Actual date in monthly timestep depends on column.
+        return new DateTime(year, 1, 1);
     }
 }

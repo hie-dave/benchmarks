@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
 using Dave.Benchmarks.Core.Models.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Dave.Benchmarks.Core.Data;
 
 /// <summary>
-/// Entity Framework Core context for the benchmarks database.
+/// Database context for the benchmarking system.
 /// </summary>
 public class BenchmarksDbContext : DbContext
 {
@@ -14,56 +14,30 @@ public class BenchmarksDbContext : DbContext
     }
 
     public DbSet<Dataset> Datasets { get; set; } = null!;
-    public DbSet<PredictionDataset> Predictions { get; set; } = null!;
-    public DbSet<ObservationDataset> Observations { get; set; } = null!;
     public DbSet<Variable> Variables { get; set; } = null!;
-    public DbSet<Datum> Data { get; set; } = null!;
+    public DbSet<VariableLayer> VariableLayers { get; set; } = null!;
+    public DbSet<GridcellDatum> GridcellData { get; set; } = null!;
+    public DbSet<StandDatum> StandData { get; set; } = null!;
+    public DbSet<PatchDatum> PatchData { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure TPT inheritance for datasets
-        modelBuilder.Entity<Dataset>()
-            .UseTptMappingStrategy();
-
-        // Configure indexes for better query performance
-        modelBuilder.Entity<Datum>()
-            .HasIndex(d => new { d.DatasetId, d.VariableId, d.Longitude, d.Latitude });
-        
-        modelBuilder.Entity<Datum>()
-            .HasIndex(d => new { d.DatasetId, d.VariableId, d.Timestamp });
-
         // Configure relationships
-        modelBuilder.Entity<Dataset>()
-            .HasMany(d => d.Variables)
-            .WithOne(v => v.Dataset)
-            .HasForeignKey(v => v.DatasetId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        modelBuilder.Entity<Dataset>()
-            .HasMany(d => d.Data)
-            .WithOne(p => p.Dataset)
-            .HasForeignKey(p => p.DatasetId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         modelBuilder.Entity<Variable>()
-            .HasMany(v => v.Data)
-            .WithOne(p => p.Variable)
-            .HasForeignKey(p => p.VariableId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasMany(v => v.Layers)
+            .WithOne(l => l.Variable)
+            .HasForeignKey(l => l.VariableId);
 
-        // Configure table names
-        modelBuilder.Entity<Datum>()
-            .ToTable("Data");
+        // Add indexes for common query patterns
+        modelBuilder.Entity<GridcellDatum>()
+            .HasIndex(d => new { d.VariableId, d.LayerId, d.Timestamp });
         
-        modelBuilder.Entity<Variable>()
-            .ToTable("Variables");
-
-        modelBuilder.Entity<PredictionDataset>()
-            .ToTable("Predictions");
-
-        modelBuilder.Entity<ObservationDataset>()
-            .ToTable("Observations");
+        modelBuilder.Entity<StandDatum>()
+            .HasIndex(d => new { d.VariableId, d.LayerId, d.StandId, d.Timestamp });
+        
+        modelBuilder.Entity<PatchDatum>()
+            .HasIndex(d => new { d.VariableId, d.LayerId, d.StandId, d.PatchId, d.Timestamp });
     }
 }

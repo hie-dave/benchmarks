@@ -1,41 +1,31 @@
-using System;
-using System.Threading.Tasks;
 using Dave.Benchmarks.Core.Data;
 using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
+using Dave.Benchmarks.Core.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.Web.Controllers;
 
-/// <summary>
-/// Controller for managing model predictions.
-/// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("[controller]")]
 public class PredictionsController : ControllerBase
 {
-    private readonly ILogger<PredictionsController> _logger;
     private readonly BenchmarksDbContext _dbContext;
+    private readonly ILogger<PredictionsController> logger;
 
     public PredictionsController(
-        ILogger<PredictionsController> logger,
-        BenchmarksDbContext dbContext)
+        BenchmarksDbContext dbContext,
+        ILogger<PredictionsController> logger)
     {
-        _logger = logger;
         _dbContext = dbContext;
+        this.logger = logger;
     }
 
-    /// <summary>
-    /// Creates a new model prediction dataset.
-    /// </summary>
-    [HttpPost("create")]
-    public async Task<IActionResult> CreateDataset([FromBody] CreateDatasetRequest request)
+    [HttpPost]
+    public async Task<ActionResult<Dataset>> Create([FromBody] CreateDatasetRequest request)
     {
-        _logger.LogInformation("Creating model prediction dataset: {Name}", request.Name);
-
-        var dataset = new PredictionDataset
+        var dataset = new Dataset
         {
             Name = request.Name,
             Description = request.Description,
@@ -44,67 +34,128 @@ public class PredictionsController : ControllerBase
             ClimateDataset = request.ClimateDataset,
             SpatialResolution = request.SpatialResolution,
             TemporalResolution = request.TemporalResolution,
-            CodePatches = request.CodePatches
+            CompressedParameters = request.CompressedParameters,
+            CompressedCodePatches = request.CompressedCodePatches
         };
 
-        dataset.SetParameters(request.Parameters);
-
-        _dbContext.Predictions.Add(dataset);
+        _dbContext.Datasets.Add(dataset);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new { Id = dataset.Id });
+        return Ok(dataset);
     }
 
-    /// <summary>
-    /// Adds a quantity into an existing model prediction dataset.
-    /// </summary>
-    [HttpPost("add")]
-    public async Task<IActionResult> AddQuantity([FromBody] ImportModelPredictionRequest request)
+    [HttpPost("{datasetId}/quantities")]
+    public async Task<ActionResult> AddQuantity(int datasetId, [FromBody] Quantity quantity)
     {
-        var dataset = await _dbContext.Predictions
+        var dataset = await _dbContext.Datasets
             .Include(d => d.Variables)
-            .Include(d => d.Data)
-            .FirstOrDefaultAsync(d => d.Id == request.DatasetId);
+            .FirstOrDefaultAsync(d => d.Id == datasetId);
 
         if (dataset == null)
-            return NotFound($"Dataset with ID {request.DatasetId} not found");
+            return NotFound($"Dataset {datasetId} not found");
 
-        _logger.LogInformation(
-            "Importing quantity {Quantity} into dataset: {Name}", 
-            request.Quantity.Name,
-            dataset.Name);
+        // Check if variable exists
+        Variable? variable = dataset.Variables
+            .FirstOrDefault(v => v.Name == quantity.Name);
 
-        // Create variable for the quantity
-        var variable = new Variable
+        if (!quantity.Layers.Any())
+            throw new InvalidOperationException("At least one layer is required");
+
+        if (quantity.Layers.GroupBy(l => l.Unit).Count() > 1)
+            throw new InvalidOperationException("All layers must have the same units (TODO: we could support this in the future)");
+
+        if (variable == null)
         {
-            Name = request.Quantity.Name,
-            Description = request.Quantity.Description,
-            Dataset = dataset
-        };
-
-        // Create data points for each layer's data
-        foreach (Layer layer in request.Quantity.Layers)
-        {
-            variable.Units = layer.Unit.ToString();
-            
-            foreach (var point in layer.Data)
+            variable = new Variable
             {
-                var measurementPoint = new Datum
+                Name = quantity.Name,
+                Description = quantity.Description,
+                Units = quantity.Layers.First().Unit.Name,
+                Level = quantity.Level,
+                Dataset = dataset
+            };
+
+            _dbContext.Variables.Add(variable);
+        }
+
+        // Add layers if they don't exist
+        foreach (Layer layerData in quantity.Layers)
+        {
+            VariableLayer? layer = variable.Layers
+                .FirstOrDefault(l => l.Name == layerData.Name);
+
+            if (layer == null)
+            {
+                layer = new VariableLayer
                 {
-                    Dataset = dataset,
-                    Variable = variable,
-                    Longitude = point.Longitude,
-                    Latitude = point.Latitude,
-                    Timestamp = point.Timestamp,
-                    Value = point.Value
+                    Name = layerData.Name,
+                    // TODO: implement layer-level descriptions
+                    Description = layerData.Name,
+                    Variable = variable
                 };
-                dataset.Data.Add(measurementPoint);
+                _dbContext.VariableLayers.Add(layer);
+            }
+
+            // Add data points based on variable level
+            switch (quantity.Level)
+            {
+                case AggregationLevel.Gridcell:
+                    foreach (var point in layerData.Data)
+                    {
+                        var datum = new GridcellDatum
+                        {
+                            Variable = variable,
+                            Layer = layer,
+                            Timestamp = point.Timestamp,
+                            Longitude = point.Longitude,
+                            Latitude = point.Latitude,
+                            Value = point.Value
+                        };
+                        _dbContext.GridcellData.Add(datum);
+                    }
+                    break;
+
+                case AggregationLevel.Stand:
+                    foreach (var point in layerData.Data)
+                    {
+                        var datum = new StandDatum
+                        {
+                            Variable = variable,
+                            Layer = layer,
+                            Timestamp = point.Timestamp,
+                            Longitude = point.Longitude,
+                            Latitude = point.Latitude,
+                            StandId = point.Stand ?? throw new ArgumentException("Stand ID is required"),
+                            Value = point.Value
+                        };
+                        _dbContext.StandData.Add(datum);
+                    }
+                    break;
+
+                case AggregationLevel.Patch:
+                    foreach (var point in layerData.Data)
+                    {
+                        var datum = new PatchDatum
+                        {
+                            Variable = variable,
+                            Layer = layer,
+                            Timestamp = point.Timestamp,
+                            Longitude = point.Longitude,
+                            Latitude = point.Latitude,
+                            StandId = point.Stand ?? throw new ArgumentException("Stand ID is required"),
+                            PatchId = point.Patch ?? throw new ArgumentException("Patch ID is required"),
+                            Value = point.Value
+                        };
+                        _dbContext.PatchData.Add(datum);
+                    }
+                    break;
+
+                default:
+                    throw new ArgumentException($"Unknown variable level: {variable.Level}");
             }
         }
 
-        dataset.Variables.Add(variable);
         await _dbContext.SaveChangesAsync();
-
         return Ok();
     }
 }

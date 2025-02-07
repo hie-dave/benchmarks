@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Dave.Benchmarks.Core.Utilities;
 using LibGit2Sharp;
 using Microsoft.Extensions.Logging;
 
@@ -81,7 +82,7 @@ public class GitService
         return new RepositoryInfo
         {
             CommitHash = commitHash,
-            Patches = System.Text.Encoding.UTF8.GetBytes(allPatches),
+            Patches = CompressionUtility.CompressText(allPatches),
             RepositoryPath = repoPath,
             HasUncommittedChanges = hasUncommittedChanges
         };
