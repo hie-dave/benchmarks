@@ -14,8 +14,10 @@ public class SiteOptions : OptionsBase
             yield return new Example("Import site-level model output", new SiteOptions
             {
                 RepoPath = "/path/to/repo",
-                Description = "Latest version of the model",
-                ClimateDataset = "Ozflux"
+                Name = "DAVE",
+                Description = "DAVE site-level runs",
+                ClimateDataset = "Ozflux",
+                TemporalResolution = "3-hourly",
             });
         }
     }

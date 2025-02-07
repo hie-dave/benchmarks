@@ -15,9 +15,6 @@ public class GriddedOptions : OptionsBase
     [Option('s', "spatial-resolution", Required = true, HelpText = "Spatial resolution of the runs")]
     public string SpatialResolution { get; set; } = string.Empty;
 
-    [Option('t', "temporal-resolution", Required = true, HelpText = "Temporal resolution of the runs")]
-    public string TemporalResolution { get; set; } = string.Empty;
-
     [Usage(ApplicationAlias = "dave-benchmarks")]
     public static IEnumerable<Example> Examples
     {

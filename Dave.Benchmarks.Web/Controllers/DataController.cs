@@ -24,7 +24,7 @@ public class DataController : Controller
     [HttpGet]
     public async Task<IActionResult> GetDatasetData(int datasetId, int? variableId = null)
     {
-        var query = _context.MeasurementPoints
+        var query = _context.Data
             .Where(d => d.DatasetId == datasetId);
 
         if (variableId.HasValue)

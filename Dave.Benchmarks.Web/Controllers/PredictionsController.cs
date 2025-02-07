@@ -4,6 +4,7 @@ using Dave.Benchmarks.Core.Data;
 using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.Web.Controllers;
@@ -27,12 +28,12 @@ public class PredictionsController : ControllerBase
     }
 
     /// <summary>
-    /// Imports a new model prediction dataset.
+    /// Creates a new model prediction dataset.
     /// </summary>
-    [HttpPost("import")]
-    public async Task<IActionResult> Import([FromBody] ImportModelPredictionRequest request)
+    [HttpPost("create")]
+    public async Task<IActionResult> CreateDataset([FromBody] CreateDatasetRequest request)
     {
-        _logger.LogInformation("Importing model prediction: {Name}", request.Name);
+        _logger.LogInformation("Creating model prediction dataset: {Name}", request.Name);
 
         var dataset = new PredictionDataset
         {
@@ -47,6 +48,31 @@ public class PredictionsController : ControllerBase
         };
 
         dataset.SetParameters(request.Parameters);
+
+        _dbContext.Predictions.Add(dataset);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new { Id = dataset.Id });
+    }
+
+    /// <summary>
+    /// Adds a quantity into an existing model prediction dataset.
+    /// </summary>
+    [HttpPost("add")]
+    public async Task<IActionResult> AddQuantity([FromBody] ImportModelPredictionRequest request)
+    {
+        var dataset = await _dbContext.Predictions
+            .Include(d => d.Variables)
+            .Include(d => d.Data)
+            .FirstOrDefaultAsync(d => d.Id == request.DatasetId);
+
+        if (dataset == null)
+            return NotFound($"Dataset with ID {request.DatasetId} not found");
+
+        _logger.LogInformation(
+            "Importing quantity {Quantity} into dataset: {Name}", 
+            request.Quantity.Name,
+            dataset.Name);
 
         // Create variable for the quantity
         var variable = new Variable
@@ -77,11 +103,8 @@ public class PredictionsController : ControllerBase
         }
 
         dataset.Variables.Add(variable);
-
-        // Save dataset
-        _dbContext.ModelPredictions.Add(dataset);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new { Id = dataset.Id });
+        return Ok();
     }
 }

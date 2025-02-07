@@ -14,10 +14,10 @@ public class BenchmarksDbContext : DbContext
     }
 
     public DbSet<Dataset> Datasets { get; set; } = null!;
-    public DbSet<PredictionDataset> ModelPredictions { get; set; } = null!;
+    public DbSet<PredictionDataset> Predictions { get; set; } = null!;
     public DbSet<ObservationDataset> Observations { get; set; } = null!;
     public DbSet<Variable> Variables { get; set; } = null!;
-    public DbSet<Datum> MeasurementPoints { get; set; } = null!;
+    public DbSet<Datum> Data { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

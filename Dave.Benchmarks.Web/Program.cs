@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Dave.Benchmarks.Core.Data;
 using Dave.Benchmarks.Core.Logging;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -10,7 +11,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.ConfigureLogging();
 
 // Add database context
-builder.Services.AddDbContext<Dave.Benchmarks.Core.Data.BenchmarksDbContext>(options =>
+builder.Services.AddDbContext<BenchmarksDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection")),
@@ -18,6 +19,13 @@ builder.Services.AddDbContext<Dave.Benchmarks.Core.Data.BenchmarksDbContext>(opt
     ));
 
 WebApplication app = builder.Build();
+
+// Apply pending migrations
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<BenchmarksDbContext>();
+    context.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

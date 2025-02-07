@@ -18,7 +18,18 @@ namespace Dave.Benchmarks.CLI.Commands;
 /// </summary>
 public class ImportHandler
 {
-    private const string endpoint = "api/predictions/import";
+    // Site-level runs are point-scale by definition.
+    private const string siteLevelSpatialResolution = "Point";
+
+    /// <summary>
+    /// API endpoint used to upload data to a dataset.
+    /// </summary>
+    private const string addEndpoint = "api/predictions/add";
+
+    /// <summary>
+    /// API endpoint used to create a dataset.
+    /// </summary>
+    private const string createEndpoint = "api/predictions/create";
 
     private readonly ILogger<ImportHandler> _logger;
     private readonly ModelOutputParser _parser;
@@ -99,6 +110,59 @@ public class ImportHandler
             filePath);
     }
 
+    private string[] EnumerateOutputFiles(string directory)
+    {
+        return Directory.GetFiles(directory, "*.out");
+    }
+
+    private async Task<int> CreateDataset(
+        string name,
+        string description,
+        string parameters,
+        GitService.RepositoryInfo repoInfo,
+        string climateDataset,
+        string spatialResolution,
+        string temporalResolution)
+    {
+        var request = new CreateDatasetRequest
+        {
+            Name = name,
+            Description = description,
+            ModelVersion = repoInfo.CommitHash,
+            ClimateDataset = climateDataset,
+            SpatialResolution = spatialResolution,
+            TemporalResolution = temporalResolution,
+            Parameters = parameters,
+            CodePatches = repoInfo.Patches
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<CreateDatasetResponse>();
+        if (result == null)
+            throw new InvalidOperationException("Server returned an empty response when creating dataset");
+            
+        return result.Id;
+    }
+
+    private async Task ImportOutputFile(int datasetId, string outputFile)
+    {
+        _logger.LogDebug("Importing {File}", outputFile);
+
+        // Parse output file
+        Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);
+
+        var request = new ImportModelPredictionRequest
+        {
+            DatasetId = datasetId,
+            Quantity = quantity
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(addEndpoint, request);
+        response.EnsureSuccessStatusCode();
+    }
+
     /// <summary>
     /// Import all output files from a gridded run and upload them to the DB.
     /// </summary>
@@ -120,6 +184,16 @@ public class ImportHandler
 
         DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
 
+        // Create dataset
+        int datasetId = await CreateDataset(
+            options.Name,
+            options.Description,
+            parameters,
+            repoInfo,
+            options.ClimateDataset,
+            options.SpatialResolution,
+            options.TemporalResolution);
+
         // Process each output file, skipping stale ones
         foreach (string outputFile in outputFiles)
         {
@@ -129,22 +203,8 @@ public class ImportHandler
                 continue;
             }
 
-            string variableName = Path.GetFileNameWithoutExtension(outputFile);
-            await ImportOutputFile(
-                outputFile,
-                variableName,
-                string.Format(options.Description, variableName),
-                parameters,
-                repoInfo,
-                options.ClimateDataset,
-                options.SpatialResolution,
-                options.TemporalResolution);
+            await ImportOutputFile(datasetId, outputFile);
         }
-    }
-
-    private string[] EnumerateOutputFiles(string directory)
-    {
-        return Directory.GetFiles(directory, "*.out");
     }
 
     public async Task HandleSiteImport(SiteOptions options)
@@ -189,6 +249,16 @@ public class ImportHandler
                 continue;
             }
 
+            // Create dataset
+            int datasetId = await CreateDataset(
+                options.Name,
+                options.Description,
+                parameters,
+                repoInfo,
+                options.ClimateDataset,
+                siteLevelSpatialResolution,
+                options.TemporalResolution);
+
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
             {
@@ -199,72 +269,8 @@ public class ImportHandler
                 }
 
                 string variableName = Path.GetFileNameWithoutExtension(outputFile);
-                await ImportOutputFile(
-                    outputFile,
-                    variableName,
-                    options.Description,
-                    parameters,
-                    repoInfo,
-                    options.ClimateDataset,
-                    "Point",  // Site-level runs are always point-scale
-                    "Daily"); // Site-level runs are always daily
+                await ImportOutputFile(datasetId, outputFile);
             }
         }
-    }
-
-    /// <summary>
-    /// Imports a single output file and uploads it to the DB.
-    /// </summary>
-    /// <param name="outputFile">Path to the output file.</param>
-    /// <param name="name">Name of the quantity.</param>
-    /// <param name="description">Description of the quantity.</param>
-    /// <param name="parameters">Parameters used to run the model.</param>
-    /// <param name="repoInfo">Information about the repository.</param>
-    /// <param name="climateDataset">Climate dataset used in the run.</param>
-    /// <param name="spatialResolution">Spatial resolution of the run.</param>
-    /// <param name="temporalResolution">Temporal resolution of the run.</param>
-    private async Task ImportOutputFile(
-        string outputFile,
-        string name,
-        string description,
-        string parameters,
-        GitService.RepositoryInfo repoInfo,
-        string climateDataset,
-        string spatialResolution,
-        string temporalResolution)
-    {
-        _logger.LogDebug("Importing {File}", outputFile);
-
-        // Parse output file
-        Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);
-
-        ImportModelPredictionRequest request = new()
-        {
-            Name = name,
-            Description = description,
-            ModelVersion = repoInfo.CommitHash,
-            ClimateDataset = climateDataset,
-            SpatialResolution = spatialResolution,
-            TemporalResolution = temporalResolution,
-            Parameters = parameters,
-            CodePatches = repoInfo.Patches,
-            Quantity = quantity
-        };
-
-        _logger.LogDebug("Sending request to: {Uri}", _httpClient.BaseAddress != null 
-            ? new Uri(_httpClient.BaseAddress, endpoint).ToString()
-            : endpoint);
-
-        return;
-        HttpResponseMessage response = await _httpClient.PostAsJsonAsync(endpoint, request);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            _logger.LogError("Failed to import predictions. Status code: {StatusCode}, Reason: {ReasonPhrase}", 
-                response.StatusCode, 
-                response.ReasonPhrase);
-        }
-
-        response.EnsureSuccessStatusCode();
     }
 }
