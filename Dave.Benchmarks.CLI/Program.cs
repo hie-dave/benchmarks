@@ -28,6 +28,7 @@ builder.Services.AddTransient<GitService>();
 builder.Services.AddTransient<InstructionFileParser>();
 builder.Services.AddTransient<CommandRunner>();
 builder.Services.AddTransient<ImportHandler>();
+builder.Services.AddSingleton<IOutputFileTypeResolver, OutputFileTypeResolver>();
 
 builder.Services.AddHttpClient<ImportHandler>((sp, client) =>
 {

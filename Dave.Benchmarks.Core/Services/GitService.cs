@@ -24,13 +24,12 @@ public class GitService
         public bool HasUncommittedChanges { get; set; }
     }
 
-    public RepositoryInfo GetRepositoryInfo(string path, string? explicitRepoPath = null)
+    public RepositoryInfo GetRepositoryInfo(string repoPath)
     {
         using var _ = _logger.BeginScope("git");
-        var repoPath = explicitRepoPath ?? FindRepositoryPath(path);
         if (string.IsNullOrEmpty(repoPath))
         {
-            throw new InvalidOperationException($"No git repository found in or above {path}");
+            throw new InvalidOperationException($"No git repository found in or above {repoPath}");
         }
 
         using var repo = new Repository(repoPath);

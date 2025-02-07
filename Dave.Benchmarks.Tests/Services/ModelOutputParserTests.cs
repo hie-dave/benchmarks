@@ -20,12 +20,26 @@ public class ModelOutputParserTests : IAsyncLifetime
     private readonly string _testDir;
     private readonly ModelOutputParser _parser;
     private readonly Mock<ILogger<ModelOutputParser>> _logger;
+    private readonly Mock<IOutputFileTypeResolver> _resolver;
 
     public ModelOutputParserTests()
     {
         _testDir = Path.Combine(Path.GetTempPath(), "output_tests");
         _logger = new Mock<ILogger<ModelOutputParser>>();
-        _parser = new ModelOutputParser(_logger.Object);
+        _resolver = new Mock<IOutputFileTypeResolver>();
+        _parser = new ModelOutputParser(_logger.Object, _resolver.Object);
+
+        // Setup resolver to return known file types
+        _resolver.Setup(r => r.GetFileType(It.IsAny<string>()))
+            .Returns<string>(filename => 
+            {
+                string name = Path.GetFileNameWithoutExtension(filename);
+                return name switch
+                {
+                    "lai" => "file_lai",
+                    _ => throw new InvalidOperationException($"Unknown file type: {name}")
+                };
+            });
     }
 
     public Task InitializeAsync()
@@ -135,7 +149,7 @@ public class ModelOutputParserTests : IAsyncLifetime
         // Arrange
         var content = @"Lon Lat Year Day LAI NPP
 151.25 -33.75 2000 1 invalid 10.2";
-        var filePath = Path.Combine(_testDir, "lai.out");
+        var filePath = Path.Combine(_testDir, "laif");
         await File.WriteAllTextAsync(filePath, content);
 
         // Act & Assert

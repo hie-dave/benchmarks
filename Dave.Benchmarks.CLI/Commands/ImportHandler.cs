@@ -25,21 +25,34 @@ public class ImportHandler
     private readonly GitService _gitService;
     private readonly InstructionFileParser _instructionParser;
     private readonly HttpClient _httpClient;
+    private readonly IOutputFileTypeResolver _resolver;
 
-    private const double StaleFileThresholdSeconds = 5.0; // Files more than 5 seconds older than the newest file are considered stale
+    /// <summary>
+    /// Sites with output files written more than this number of seconds before
+    /// the most recent write time of any site-level run are considered stale.
+    /// </summary>
+    private const int staleSiteThresholdSeconds = 300;
+
+    /// <summary>
+    /// Output files written more than this number of seconds before the 
+    /// newest file are considered stale.
+    /// </summary>
+    private const double staleFileThresholdSeconds = 5.0;
 
     public ImportHandler(
         ILogger<ImportHandler> logger,
         ModelOutputParser parser,
         GitService gitService,
         InstructionFileParser instructionParser,
-        HttpClient httpClient)
+        HttpClient httpClient,
+        IOutputFileTypeResolver resolver)
     {
         _logger = logger;
         _parser = parser;
         _gitService = gitService;
         _instructionParser = instructionParser;
         _httpClient = httpClient;
+        _resolver = resolver;
 
         if (_httpClient.BaseAddress == null)
             throw new InvalidOperationException("ImportHandler: Base address is null");
@@ -68,7 +81,7 @@ public class ImportHandler
         FileInfo fileInfo = new(filePath);
         TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
         
-        return age.TotalSeconds > StaleFileThresholdSeconds;
+        return age.TotalSeconds > staleFileThresholdSeconds;
     }
 
     /// <summary>
@@ -95,7 +108,7 @@ public class ImportHandler
     {
         // Get repository info
         using var _ = _logger.BeginScope("importer");
-        GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(options.InstructionFile, options.RepoPath);
+        GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(options.RepoPath);
 
         // Parse instruction file
         string parameters = await _instructionParser.ParseInstructionFileAsync(options.InstructionFile);
@@ -129,6 +142,11 @@ public class ImportHandler
         }
     }
 
+    private string[] EnumerateOutputFiles(string directory)
+    {
+        return Directory.GetFiles(directory, "*.out");
+    }
+
     public async Task HandleSiteImport(SiteOptions options)
     {
         using var _ = _logger.BeginScope("importer");
@@ -138,20 +156,38 @@ public class ImportHandler
         if (!runs.Any())
             throw new InvalidOperationException("No site-level runs found in repository");
 
+        // Get repository info
+        GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(options.RepoPath);
+
+        // Get time stamp of most recently-written output file.
+        IEnumerable<string> allFiles = runs.SelectMany(r => EnumerateOutputFiles(r.Item3));
+        DateTime globalTimestamp = GetMostRecentWriteTime(allFiles.ToArray());
+
         foreach ((string siteName, string instructionFile, string outputDir) in runs)
         {
-            // Get repository info
-            GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(instructionFile, options.RepoPath);
-
             // Parse instruction file
             string parameters = await _instructionParser.ParseInstructionFileAsync(instructionFile);
+            
+            // Build the lookup table for this site's output files
+            _resolver.BuildLookupTable(_instructionParser);
 
             // Get all output files and find most recent write time
-            string[] outputFiles = Directory.GetFiles(outputDir, "*.out");
-            if (outputFiles.Length == 0)
+            string[] outputFiles = EnumerateOutputFiles(outputDir);
+            if (!outputFiles.Any())
+            {
+                // GetMostRecentWriteTime() will throw on empty collections.
+                _logger.LogWarning("Site {siteName} has no output files", siteName);
                 continue;
+            }
 
+            // Get most recent write time for this site.
             DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
+
+            if ((globalTimestamp - mostRecentWriteTime).TotalSeconds > staleSiteThresholdSeconds)
+            {
+                _logger.LogWarning("Site {siteName} is stale (age: {age})", siteName, TimeUtils.FormatTimeSpan(globalTimestamp - mostRecentWriteTime));
+                continue;
+            }
 
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
@@ -161,7 +197,6 @@ public class ImportHandler
                     EmitStaleFileWarning(outputFile, mostRecentWriteTime);
                     continue;
                 }
-
 
                 string variableName = Path.GetFileNameWithoutExtension(outputFile);
                 await ImportOutputFile(
@@ -198,7 +233,7 @@ public class ImportHandler
         string spatialResolution,
         string temporalResolution)
     {
-        _logger.LogInformation("Importing {File}", outputFile);
+        _logger.LogDebug("Importing {File}", outputFile);
 
         // Parse output file
         Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);

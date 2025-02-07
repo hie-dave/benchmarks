@@ -7,39 +7,69 @@ using System.Threading.Tasks;
 
 namespace Dave.Benchmarks.Core.Services;
 
+/// <summary>
+/// Parses LPJ-GUESS instruction files, handling imports and parameter definitions.
+/// </summary>
 public class InstructionFileParser
 {
-    private readonly HashSet<string> _processedFiles = new();
+    private readonly HashSet<string> processedFiles = new();
     private static readonly Regex ImportRegex = new(@"^import\s+""([^""]+)""", RegexOptions.Compiled);
+    private static readonly Regex ParameterRegex = new(@"^(\S+)\s+""?([^""]+)""?", RegexOptions.Compiled);
+    private readonly Dictionary<string, string> parameters = new();
 
+    /// <summary>
+    /// Parses an instruction file and returns its contents with all imports resolved.
+    /// </summary>
+    /// <param name="filePath">Path to the instruction file to parse.</param>
+    /// <returns>The processed instruction file contents.</returns>
     public async Task<string> ParseInstructionFileAsync(string filePath)
     {
-        _processedFiles.Clear();
+        processedFiles.Clear();
+        parameters.Clear();
         return await ParseFileAsync(filePath);
+    }
+
+    /// <summary>
+    /// Gets the value of a parameter from the instruction file.
+    /// </summary>
+    /// <param name="parameterName">Name of the parameter to retrieve.</param>
+    /// <returns>The parameter value if found, null otherwise.</returns>
+    public bool TryGetParameterValue(string parameterName, out string? value)
+    {
+        return parameters.TryGetValue(parameterName, out value);
+    }
+
+    /// <summary>
+    /// Gets all parameters that match a specified prefix.
+    /// </summary>
+    /// <param name="prefix">The prefix to match against parameter names.</param>
+    /// <returns>Dictionary of matching parameter names and their values.</returns>
+    public Dictionary<string, string> GetParametersByPrefix(string prefix)
+    {
+        Dictionary<string, string> result = new();
+        foreach (var kvp in parameters)
+            if (kvp.Key.StartsWith(prefix))
+                result.Add(kvp.Key, kvp.Value);
+        return result;
     }
 
     private async Task<string> ParseFileAsync(string filePath)
     {
-        var absolutePath = Path.GetFullPath(filePath);
+        string absolutePath = Path.GetFullPath(filePath);
         if (!File.Exists(absolutePath))
-        {
             throw new FileNotFoundException($"Instruction file not found: {absolutePath}");
-        }
 
-        if (_processedFiles.Contains(absolutePath))
-        {
-            // Skip files we've already processed to avoid circular imports
+        if (processedFiles.Contains(absolutePath))
             return string.Empty;
-        }
 
-        _processedFiles.Add(absolutePath);
-        var baseDir = Path.GetDirectoryName(absolutePath)!;
-        var sb = new StringBuilder();
+        processedFiles.Add(absolutePath);
+        string baseDir = Path.GetDirectoryName(absolutePath)!;
+        StringBuilder sb = new();
 
-        var lines = await File.ReadAllLinesAsync(absolutePath);
-        foreach (var line in lines)
+        string[] lines = await File.ReadAllLinesAsync(absolutePath);
+        foreach (string line in lines)
         {
-            var trimmedLine = line.Trim();
+            string trimmedLine = line.Trim();
             
             // Skip empty lines and comments
             if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("!"))
@@ -48,24 +78,28 @@ public class InstructionFileParser
                 continue;
             }
 
-            var match = ImportRegex.Match(trimmedLine);
-            if (match.Success)
+            Match importMatch = ImportRegex.Match(trimmedLine);
+            if (importMatch.Success)
             {
-                var importPath = match.Groups[1].Value;
-                var fullPath = Path.GetFullPath(Path.Combine(baseDir, importPath));
+                string importPath = importMatch.Groups[1].Value;
+                string fullPath = Path.GetFullPath(Path.Combine(baseDir, importPath));
                 
-                // Add a comment to show where this import came from
                 sb.AppendLine($"! Imported from: {importPath}");
-                
-                // Recursively process the imported file
-                var importedContent = await ParseFileAsync(fullPath);
+                string importedContent = await ParseFileAsync(fullPath);
                 sb.AppendLine(importedContent);
-                
-                // Add a comment to show where the import ends
                 sb.AppendLine($"! End of import: {importPath}");
             }
             else
             {
+                // Try to parse as a parameter
+                Match paramMatch = ParameterRegex.Match(trimmedLine);
+                if (paramMatch.Success)
+                {
+                    string paramName = paramMatch.Groups[1].Value;
+                    string paramValue = paramMatch.Groups[2].Value;
+                    parameters[paramName] = paramValue;
+                }
+                
                 sb.AppendLine(line);
             }
         }

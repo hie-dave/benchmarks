@@ -11,25 +11,39 @@ using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.CLI.Services;
 
+/// <summary>
+/// Parser for LPJ-GUESS model output files.
+/// </summary>
 public class ModelOutputParser
 {
-    private readonly ILogger<ModelOutputParser> logger;
+    private readonly ILogger logger;
+    private readonly IOutputFileTypeResolver resolver;
 
-    public ModelOutputParser(ILogger<ModelOutputParser> logger)
+    /// <summary>
+    /// Creates a new instance of the ModelOutputParser.
+    /// </summary>
+    /// <param name="logger">Logger for diagnostic messages.</param>
+    /// <param name="resolver">Resolver for output file types.</param>
+    public ModelOutputParser(ILogger<ModelOutputParser> logger, IOutputFileTypeResolver resolver)
     {
         this.logger = logger;
+        this.resolver = resolver;
     }
 
+    /// <summary>
+    /// Parses an output file.
+    /// </summary>
+    /// <param name="filePath">Path to the output file.</param>
+    /// <returns>A task representing the parse operation.</returns>
     public async Task<Quantity> ParseOutputFileAsync(string filePath)
     {
         logger.LogInformation("Parsing output file: {filePath}", filePath);
-        string? fileType = Path.GetFileNameWithoutExtension(filePath);
 
-        using var _ = logger.BeginScope("{fileType}", fileType);
+        using var _ = logger.BeginScope("{fileName}", Path.GetFileName(filePath));
 
         try
         {
-            return await ParseOutputFileInternalAsync(filePath, fileType);
+            return await ParseOutputFileInternalAsync(filePath);
         }
         catch (Exception ex) when (ex is not InvalidDataException)
         {
@@ -40,10 +54,16 @@ public class ModelOutputParser
         }
     }
 
-    private async Task<Quantity> ParseOutputFileInternalAsync(string filePath, string fileType)
+    private async Task<Quantity> ParseOutputFileInternalAsync(string filePath)
     {
+        logger.LogDebug("Retrieving output file type");
+        string fileName = Path.GetFileName(filePath);
+        string fileType = resolver.GetFileType(fileName);
+        logger.LogTrace("Output file {fileName} successfully resolved to type: {fileType}", fileName, fileType);
+
         logger.LogDebug("Retrieving output file metadata");
         OutputFileMetadata metadata = OutputFileDefinitions.GetMetadata(fileType);
+        logger.LogTrace("Output file metadata successfully retrieved: {description}", metadata.Description);
 
         logger.LogDebug("Reading output file");
         string[] lines = await File.ReadAllLinesAsync(filePath);
@@ -113,12 +133,9 @@ public class ModelOutputParser
     /// <returns>A dictionary mapping column names to column indices.</returns>
     private IReadOnlyDictionary<string, int> GetColumnIndices(string[] headers)
     {
-        Dictionary<string, int> indices = [];
-
-        // Find required column indices.
+        Dictionary<string, int> indices = new();
         for (int i = 0; i < headers.Length; i++)
             indices[headers[i]] = i;
-
         return indices;
     }
 
