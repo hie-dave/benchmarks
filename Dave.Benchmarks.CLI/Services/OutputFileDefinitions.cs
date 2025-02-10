@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Dave.Benchmarks.CLI.Models;
 using Dave.Benchmarks.Core.Models.Entities;
+using Dave.Benchmarks.Core.Models.Importer;
 
 namespace Dave.Benchmarks.CLI.Services;
 
@@ -48,6 +49,8 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "file_dave_cgrow_repr", "Reproductive Growth", "Daily reproductive growth", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_diameter_inc", "Diameter Growth", "Daily diameter growth", "m/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_height_inc", "Height Growth", "Daily height growth", "m/day", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_height", "Plant Height", "Plant Height (m)", "m", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_diameter", "Stem Diameter", "Stem Diameter (m)", "m", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_dturnover_leaf", "Leaf Turnover", "Daily leaf C turnover flux", "kgC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_dturnover_root", "Root Turnover", "Daily root C turnover flux", "kgC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_dturnover_sap", "Sap Turnover", "Daily sapwood C turnover flux", "kgC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
@@ -73,14 +76,16 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "file_dave_cmass_leaf_brown", "Brown Leaf C Mass", "Daily brown leaf carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_leaf", "Leaf N Mass", "Daily leaf nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_cmass_crown", "Crown C Mass", "Daily crown carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_cmass_repr", "Reproductive C Mass", "Daily reproductive carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_root", "Root N Mass", "Daily root nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass", "Vegetation Nitrogen Mass", "Daily PFT-level total nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_cmass_storage_max", "Max Storage C Mass", "Daily maximum storage carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_storage", "Storage N Mass", "Daily storage nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_storage_max", "Max Storage N Mass", "Daily maximum storage nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
-        AddPftOutput(builder, "file_dave_nmass_sap", "Sap N Mass", "Daily sapwood nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
-        AddPftOutput(builder, "file_dave_cmass_heart", "Heart C Mass", "Daily heartwood carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
-        AddPftOutput(builder, "file_dave_nmass_heart", "Heart N Mass", "Daily heartwood nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_cmass_sap", "Sap C Mass", "Daily Sapwood Carbon Mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_nmass_sap", "Sap N Mass", "Daily Sapwood Nitrogen Mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_cmass_heart", "Heart C Mass", "Daily Heartwood Carbon Mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_nmass_heart", "Heart N Mass", "Daily Heartwood Nitrogen Mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_repr", "Reproductive N Mass", "Daily reproductive nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_ndemand", "N Demand", "Daily nitrogen demand", "kgN/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_density", "Density", "Daily individual density", "indiv/m2", AggregationLevel.Patch, TemporalResolution.Daily);

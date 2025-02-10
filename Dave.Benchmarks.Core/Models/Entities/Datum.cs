@@ -1,19 +1,55 @@
+using System;
+
 namespace Dave.Benchmarks.Core.Models.Entities;
 
 /// <summary>
-/// Represents a single measurement point in a dataset, containing a value at a specific location and time.
+/// Base class for all data points.
 /// </summary>
-public class Datum
+public abstract class Datum
 {
-    public long Id { get; set; }
-    public double Longitude { get; set; }
-    public double Latitude { get; set; }
-    public DateTime Timestamp { get; set; }
+    /// <summary>
+    /// The unique identifier for this data point.
+    /// </summary>
+    public int Id { get; set; }
+
+    /// <summary>
+    /// The value at this data point.
+    /// </summary>
     public double Value { get; set; }
-    
+
+    /// <summary>
+    /// When this data point was recorded.
+    /// </summary>
+    public DateTime Timestamp { get; set; }
+
+    /// <summary>
+    /// The longitude in degrees.
+    /// </summary>
+    public double Longitude { get; set; }
+
+    /// <summary>
+    /// The latitude in degrees.
+    /// </summary>
+    public double Latitude { get; set; }
+
     // Navigation properties
-    public int DatasetId { get; set; }
-    public Dataset Dataset { get; set; } = null!;
+    /// <summary>
+    /// The ID of the variable this data point belongs to.
+    /// </summary>
     public int VariableId { get; set; }
+
+    /// <summary>
+    /// Navigation property for the variable this data point belongs to.
+    /// </summary>
     public Variable Variable { get; set; } = null!;
+
+    /// <summary>
+    /// The ID of the layer this data point belongs to.
+    /// </summary>
+    public int LayerId { get; set; }
+
+    /// <summary>
+    /// Navigation property for the layer this data point belongs to.
+    /// </summary>
+    public VariableLayer Layer { get; set; } = null!;
 }

@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Dave.Benchmarks.CLI.Models;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Utilities;
@@ -11,6 +5,7 @@ using Microsoft.Extensions.Logging;
 
 using TemporalResolution = Dave.Benchmarks.Core.Models.Entities.TemporalResolution;
 using AggregationLevel = Dave.Benchmarks.Core.Models.Entities.AggregationLevel;
+
 using Dave.Benchmarks.Core.Utils;
 
 namespace Dave.Benchmarks.CLI.Services;
@@ -71,6 +66,7 @@ public class ModelOutputParser
         string[] lines = await File.ReadAllLinesAsync(filePath);
         if (lines.Length < 2)
             ExceptionHelper.Throw<InvalidDataException>(logger, "File must contain at least a header row and one data row");
+        var state = new ParserState(filePath);
 
         // Parse header row to get column indices.
         logger.LogDebug("Parsing header row");
@@ -88,6 +84,7 @@ public class ModelOutputParser
         // Parse data rows.
         for (int i = 1; i < lines.Length; i++)
         {
+            state.CurrentLine = i;
             string[] values = SplitLine(lines[i]);
             using var __ = logger.BeginScope("Row {i}", i);
 
@@ -101,6 +98,34 @@ public class ModelOutputParser
             logger.LogTrace("Parsing data values");
             foreach (string name in dataColumns)
             {
+                // Special handling for PFT column in individual outputs
+                if (metadata.Level == AggregationLevel.Individual && name.Equals("pft", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (point.Individual is null)
+                        ExceptionHelper.Throw<InvalidDataException>(logger, "Individual ID is required for individual-level outputs");
+
+                    string pftName = values[indices[name]];
+                    int indivId = point.Individual!.Value;
+
+                    // Check if we've seen this individual before
+                    if (state.IndividualPfts.TryGetValue(indivId, out var existing))
+                    {
+                        if (existing.PftName != pftName)
+                        {
+                            ExceptionHelper.Throw<InvalidDataException>(logger,
+                                $"Inconsistent PFT mapping in file {Path.GetFileName(state.FilePath)}: " +
+                                $"Individual {indivId} is mapped to '{pftName}' on line {i + 1} " +
+                                $"but was mapped to '{existing.PftName}' on line {existing.LineNumber + 1}");
+                        }
+                    }
+                    else
+                    {
+                        // First time seeing this individual
+                        state.IndividualPfts[indivId] = (pftName, i);
+                    }
+                    continue;
+                }
+
                 if (!double.TryParse(values[indices[name]], out double value))
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid value: failed to parse double: {values[indices[name]]}");
 
@@ -113,7 +138,7 @@ public class ModelOutputParser
                     {
                         month = TimeUtils.GetMonth(name);
                     }
-                    catch (ArgumentException e)
+                    catch (ArgumentException)
                     {
                         if (metadata.Layers is StaticLayers s && ModelConstants.MonthCols.All(s.IsDataLayer))
                             // File has Jan..Dec plus some additional layers.
@@ -145,7 +170,20 @@ public class ModelOutputParser
         foreach ((string name, List<DataPoint> points) in seriesData)
             layers.Add(new Layer(name, metadata.Layers.GetUnits(name), points));
 
-        return new Quantity(metadata.Name, metadata.Description, layers, metadata.Level, metadata.TemporalResolution);
+        // Convert ParserState's IndividualPfts to simple dictionary for the Quantity
+        var individualPfts = metadata.Level == AggregationLevel.Individual
+            ? state.IndividualPfts.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value.PftName)
+            : null;
+
+        return new Quantity(
+            metadata.Name,
+            metadata.Description,
+            layers,
+            metadata.Level,
+            metadata.TemporalResolution,
+            individualPfts);
     }
 
     /// <summary>
@@ -172,7 +210,7 @@ public class ModelOutputParser
     }
 
     /// <summary>
-    /// The coordinate defining the spatio-temporal location of a data point.
+    /// Represents a point in space and time.
     /// </summary>
     /// <param name="Lon">Longitude in degrees.</param>
     /// <param name="Lat">Latitude in degrees.</param>
@@ -189,7 +227,33 @@ public class ModelOutputParser
         int? Individual = null);
 
     /// <summary>
-    /// Parse required columns from a row of an output file.
+    /// Tracks state while parsing a file, including PFT mappings and line numbers.
+    /// </summary>
+    private class ParserState
+    {
+        /// <summary>
+        /// Maps individual IDs to their PFT name and the line where first encountered.
+        /// </summary>
+        public Dictionary<int, (string PftName, int LineNumber)> IndividualPfts { get; } = [];
+
+        /// <summary>
+        /// The current line being parsed (0-based).
+        /// </summary>
+        public int CurrentLine { get; set; }
+
+        /// <summary>
+        /// The path to the file being parsed.
+        /// </summary>
+        public string FilePath { get; }
+
+        public ParserState(string filePath)
+        {
+            FilePath = filePath;
+        }
+    }
+
+    /// <summary>
+    /// Parse the required columns from a row of data.
     /// </summary>
     /// <param name="values">The raw values from the row.</param>
     /// <param name="indices">The column indices for the required columns.</param>
@@ -229,10 +293,10 @@ public class ModelOutputParser
                 if (!int.TryParse(values[standIndex], out int stand))
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid stand value: {values[standIndex]}");
                 standId = stand;
-            }
+        }
 
-            if (metadata.Level >= AggregationLevel.Patch)
-            {
+        if (metadata.Level >= AggregationLevel.Patch)
+        {
                 if (!indices.TryGetValue(ModelConstants.PatchLayer, out int patchIndex))
                     ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Patch");
                 if (!int.TryParse(values[patchIndex], out int patch))
@@ -240,7 +304,7 @@ public class ModelOutputParser
                 patchId = patch;
 
                 if (metadata.Level == AggregationLevel.Individual)
-                {
+        {
                     if (!indices.TryGetValue(ModelConstants.IndivLayer, out int individualIndex))
                         ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Individual");
                     if (!int.TryParse(values[individualIndex], out int individual))

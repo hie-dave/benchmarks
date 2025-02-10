@@ -1,3 +1,5 @@
+using Dave.Benchmarks.Core.Models.Importer;
+
 namespace Dave.Benchmarks.CLI.Models;
 
 /// <summary>

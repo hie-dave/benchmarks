@@ -1,7 +1,6 @@
 using Dave.Benchmarks.Core.Data;
 using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
-using Dave.Benchmarks.Core.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -47,12 +46,32 @@ public class PredictionsController : ControllerBase
     [HttpPost("{datasetId}/add")]
     public async Task<ActionResult> AddQuantity(int datasetId, [FromBody] Quantity quantity)
     {
-        var dataset = await _dbContext.Datasets
+        Dataset? dataset = await _dbContext.Datasets
             .Include(d => d.Variables)
             .FirstOrDefaultAsync(d => d.Id == datasetId);
 
         if (dataset == null)
             return NotFound($"Dataset {datasetId} not found");
+
+        // Handle individual-level data validation and creation
+        if (quantity.Level == AggregationLevel.Individual)
+        {
+            if (quantity.IndividualPfts == null)
+                return BadRequest("Individual-level data must include PFT mappings");
+
+            try
+            {
+                await ValidateAndCreateIndividuals(datasetId, quantity.IndividualPfts);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+        else if (quantity.IndividualPfts != null)
+        {
+            return BadRequest("Non-individual-level data should not include PFT mappings");
+        }
 
         // Check if variable exists
         Variable? variable = dataset.Variables
@@ -150,6 +169,25 @@ public class PredictionsController : ControllerBase
                     }
                     break;
 
+                case AggregationLevel.Individual:
+                    foreach (var point in layerData.Data)
+                    {
+                        var datum = new IndividualDatum
+                        {
+                            Variable = variable,
+                            Layer = layer,
+                            Timestamp = point.Timestamp,
+                            Longitude = point.Longitude,
+                            Latitude = point.Latitude,
+                            StandId = point.Stand ?? throw new ArgumentException("Stand ID is required"),
+                            PatchId = point.Patch ?? throw new ArgumentException("Patch ID is required"),
+                            IndividualId = point.Individual ?? throw new ArgumentException("Individual ID is required"),
+                            Value = point.Value
+                        };
+                        _dbContext.IndividualData.Add(datum);
+                    }
+                    break;
+
                 default:
                     throw new ArgumentException($"Unknown variable level: {variable.Level}");
             }
@@ -157,5 +195,57 @@ public class PredictionsController : ControllerBase
 
         await _dbContext.SaveChangesAsync();
         return Ok();
+    }
+
+    /// <summary>
+    /// Validates PFT mappings against existing database records and creates new PFTs and Individuals as needed.
+    /// </summary>
+    /// <param name="datasetId">The dataset ID.</param>
+    /// <param name="mappings">The individual-PFT mappings to validate and create.</param>
+    /// <exception cref="InvalidOperationException">Thrown if mappings are inconsistent with database.</exception>
+    private async Task ValidateAndCreateIndividuals(int datasetId, IReadOnlyDictionary<int, string> mappings)
+    {
+        // Get existing individuals and their PFTs for this dataset
+        var existingMappings = await _dbContext.Individuals
+            .Where(i => i.DatasetId == datasetId)
+            .Select(i => new { i.Number, i.Pft.Name })
+            .ToDictionaryAsync(x => x.Number, x => x.Name);
+
+        // Check for inconsistencies with existing mappings
+        foreach (var (indivNumber, pftName) in mappings)
+        {
+            if (existingMappings.TryGetValue(indivNumber, out var existingPft) && existingPft != pftName)
+            {
+                throw new InvalidOperationException(
+                    $"Inconsistent PFT mapping: Individual {indivNumber} is mapped to '{pftName}' " +
+                    $"but exists in database with PFT '{existingPft}'");
+            }
+        }
+
+        // Get or create PFTs
+        var pftMap = new Dictionary<string, Pft>();
+        foreach (var pftName in mappings.Values.Distinct())
+        {
+            var pft = await _dbContext.Pfts.FirstOrDefaultAsync(p => p.Name == pftName);
+            if (pft == null)
+            {
+                pft = new Pft { Name = pftName };
+                _dbContext.Pfts.Add(pft);
+            }
+            pftMap[pftName] = pft;
+        }
+
+        // Create new individuals (only for those not already in database)
+        var newIndivs = mappings
+            .Where(kvp => !existingMappings.ContainsKey(kvp.Key))
+            .Select(kvp => new Individual
+            {
+                DatasetId = datasetId,
+                Number = kvp.Key,
+                Pft = pftMap[kvp.Value]
+            });
+
+        _dbContext.Individuals.AddRange(newIndivs);
+        await _dbContext.SaveChangesAsync();
     }
 }

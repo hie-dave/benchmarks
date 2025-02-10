@@ -1,6 +1,7 @@
 namespace Dave.Benchmarks.CLI.Models;
 
 using Dave.Benchmarks.Core.Models.Entities;
+using Dave.Benchmarks.Core.Models.Importer;
 
 /// <summary>
 /// Layer metadata for output files where the layer names are determined at parse-time.

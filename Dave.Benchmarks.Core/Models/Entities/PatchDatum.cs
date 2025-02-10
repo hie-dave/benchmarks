@@ -6,8 +6,10 @@ namespace Dave.Benchmarks.Core.Models.Entities;
 /// Represents a data point for an individual patch.
 /// </summary>
 [Table("PatchData")]
-public class PatchDatum : DataPoint
+public class PatchDatum : StandDatum
 {
-    public int StandId { get; set; }
+    /// <summary>
+    /// The ID of the patch this data point belongs to.
+    /// </summary>
     public int PatchId { get; set; }
 }

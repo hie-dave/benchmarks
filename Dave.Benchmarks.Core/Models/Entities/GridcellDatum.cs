@@ -6,7 +6,7 @@ namespace Dave.Benchmarks.Core.Models.Entities;
 /// Represents a data point aggregated over all stands and patches in a gridcell.
 /// </summary>
 [Table("GridcellData")]
-public class GridcellDatum : DataPoint
+public class GridcellDatum : Datum
 {
     // No additional fields needed for gridcell level
 }

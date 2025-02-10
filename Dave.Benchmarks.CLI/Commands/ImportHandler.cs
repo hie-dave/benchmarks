@@ -1,11 +1,7 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Threading.Tasks;
 using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
+using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Core.Utilities;
@@ -40,6 +36,16 @@ public class ImportHandler
     private readonly IOutputFileTypeResolver _resolver;
 
     /// <summary>
+    /// Tracks individual-PFT mappings for the current dataset being imported.
+    /// </summary>
+    private IReadOnlyDictionary<int, string>? indivMappings;
+
+    /// <summary>
+    /// The output file from which indivMappings was created.
+    /// </summary>
+    private string? indivMappingsFile;
+
+    /// <summary>
     /// Sites with output files written more than this number of seconds before
     /// the most recent write time of any site-level run are considered stale.
     /// </summary>
@@ -68,6 +74,44 @@ public class ImportHandler
 
         if (_httpClient.BaseAddress == null)
             throw new InvalidOperationException("ImportHandler: Base address is null");
+    }
+
+    private void ValidateIndivPftMappings(Quantity quantity, string fileName)
+    {
+        if (quantity.Level != AggregationLevel.Individual)
+        {
+            if (quantity.IndividualPfts != null)
+                ExceptionHelper.Throw<InvalidDataException>(_logger, $"File {fileName} is not an indiv-level output, and should therefore not contain indiv-pft mappings");
+            return;
+        }
+
+        if (indivMappings == null)
+        {
+            // First individual-level file, store the mapping and return.
+            indivMappings = quantity.IndividualPfts;
+            indivMappingsFile = fileName;
+            return;
+        }
+
+        if (quantity.IndividualPfts == null)
+            ExceptionHelper.Throw<InvalidDataException>(_logger, $"File {fileName} is an indiv-level output, but does not contain indiv-pft mappings");
+
+        // Compare with existing mapping
+        foreach ((int indivId, string pftName) in quantity.IndividualPfts!)
+        {
+            if (!indivMappings.TryGetValue(indivId, out var existingPft))
+            {
+                throw new InvalidDataException(
+                    $"Inconsistent PFT mapping in {fileName}: " +
+                    $"Individual {indivId} is mapped to '{pftName}' but was previously mapped to '{existingPft}' in file '{indivMappingsFile}'");
+            }
+            if (existingPft != pftName)
+            {
+                throw new InvalidDataException(
+                    $"Inconsistent PFT mapping in {fileName}: " +
+                    $"Individual {indivId} is mapped to '{pftName}' but was previously mapped to '{existingPft}' in file '{indivMappingsFile}'");
+            }
+        }
     }
 
     /// <summary>
@@ -122,7 +166,8 @@ public class ImportHandler
         GitService.RepositoryInfo repoInfo,
         string climateDataset,
         string spatialResolution,
-        string temporalResolution)
+        string temporalResolution,
+        bool dryRun)
     {
         var request = new CreateDatasetRequest
         {
@@ -136,6 +181,12 @@ public class ImportHandler
             CompressedCodePatches = repoInfo.Patches
         };
 
+        if (dryRun)
+        {
+            _logger.LogInformation("[DRY RUN] Dataset {name} will not be created", name);
+            return -1;
+        }
+
         var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);
         response.EnsureSuccessStatusCode();
 
@@ -146,18 +197,22 @@ public class ImportHandler
         return result.Id;
     }
 
-    private async Task ImportOutputFile(int datasetId, string outputFile)
+    private async Task ImportOutputFile(int datasetId, string outputFile, bool dryRun)
     {
-        _logger.LogInformation("Importing {File}", Path.GetFileName(outputFile));
-
-        // Parse output file
+        // Parse output file (always do this, even if dry-run is enabled).
         Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);
 
-        var request = new ImportModelPredictionRequest
+        // Validate PFT mappings if this is individual-level data
+        if (quantity.Level == AggregationLevel.Individual && quantity.IndividualPfts != null)
+            ValidateIndivPftMappings(quantity, Path.GetFileName(outputFile));
+
+        if (dryRun)
         {
-            DatasetId = datasetId,
-            Quantity = quantity
-        };
+            _logger.LogInformation("[DRY RUN] File was parsed successfully, but will not be POST-ed");
+            return;
+        }
+
+        _logger.LogInformation("Importing {File}", Path.GetFileName(outputFile));
 
         string endpoint = string.Format(addEndpoint, datasetId);
         var response = await _httpClient.PostAsJsonAsync(endpoint, quantity);
@@ -171,6 +226,9 @@ public class ImportHandler
     /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task HandleGriddedImport(GriddedOptions options)
     {
+        // Reset dataset-level state
+        indivMappings = null;
+
         // Get repository info
         using var _ = _logger.BeginScope("importer");
         GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(options.RepoPath);
@@ -193,7 +251,8 @@ public class ImportHandler
             repoInfo,
             options.ClimateDataset,
             options.SpatialResolution,
-            options.TemporalResolution);
+            options.TemporalResolution,
+            options.DryRun);
 
         // Process each output file, skipping stale ones
         foreach (string outputFile in outputFiles)
@@ -204,7 +263,7 @@ public class ImportHandler
                 continue;
             }
 
-            await ImportOutputFile(datasetId, outputFile);
+            await ImportOutputFile(datasetId, outputFile, options.DryRun);
         }
     }
 
@@ -261,7 +320,8 @@ public class ImportHandler
                 repoInfo,
                 options.ClimateDataset,
                 siteLevelSpatialResolution,
-                options.TemporalResolution);
+                options.TemporalResolution,
+                options.DryRun);
 
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
@@ -274,7 +334,7 @@ public class ImportHandler
                 }
 
                 string variableName = Path.GetFileNameWithoutExtension(outputFile);
-                await ImportOutputFile(datasetId, outputFile);
+                await ImportOutputFile(datasetId, outputFile, options.DryRun);
             }
         }
     }

@@ -6,7 +6,10 @@ namespace Dave.Benchmarks.Core.Models.Entities;
 /// Represents a data point aggregated over all patches in a stand.
 /// </summary>
 [Table("StandData")]
-public class StandDatum : DataPoint
+public class StandDatum : GridcellDatum
 {
+    /// <summary>
+    /// The ID of the stand this data point belongs to.
+    /// </summary>
     public int StandId { get; set; }
 }

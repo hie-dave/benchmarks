@@ -19,4 +19,7 @@ public class OptionsBase
 
     [Option("temporal-resolution", Required = true, HelpText = "Temporal resolution of the dataset")]
     public string TemporalResolution { get; set; } = string.Empty;
+
+    [Option("dry-run", Required = false, Default = false, HelpText = "Run without making any requests to the web server")]
+    public bool DryRun { get; set; } = false;
 }
