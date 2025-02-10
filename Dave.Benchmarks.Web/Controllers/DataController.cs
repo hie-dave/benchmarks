@@ -78,7 +78,11 @@ public class DataController : Controller
             return NotFound($"Variable {variableId} not found in dataset {datasetId}");
 
         var query = _dbContext.GridcellData
-            .Where(d => d.VariableId == variableId);
+            .Where(d => d.VariableId == variableId)
+            .Join(_dbContext.VariableLayers,
+                d => d.LayerId,
+                l => l.Id,
+                (d, l) => new { d.Timestamp, d.Value, d.Latitude, d.Longitude, LayerName = l.Name, LayerId = l.Id });
 
         if (layerId.HasValue)
             query = query.Where(d => d.LayerId == layerId.Value);
@@ -96,7 +100,7 @@ public class DataController : Controller
             {
                 timestamp = d.Timestamp.ToString("g"),
                 variableName = variable.Name,
-                layer = variable.Layers.First(l => l.Id == d.LayerId).Name,
+                layer = d.LayerName,
                 value = d.Value,
                 location = $"({d.Latitude:F2}, {d.Longitude:F2})"
             })
