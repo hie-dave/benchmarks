@@ -106,9 +106,8 @@ public class ImportHandler
         FileInfo fileInfo = new(filePath);
         TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
         
-        _logger.LogWarning("Skipping stale output file (age: {age}): {filePath}", 
-            TimeUtils.FormatTimeSpan(age),
-            filePath);
+        _logger.LogWarning("Skipping stale output file (age: {age})",
+            TimeUtils.FormatTimeSpan(age));
     }
 
     private string[] EnumerateOutputFiles(string directory)
@@ -149,7 +148,7 @@ public class ImportHandler
 
     private async Task ImportOutputFile(int datasetId, string outputFile)
     {
-        _logger.LogDebug("Importing {File}", outputFile);
+        _logger.LogInformation("Importing {File}", Path.GetFileName(outputFile));
 
         // Parse output file
         Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);
@@ -227,6 +226,8 @@ public class ImportHandler
 
         foreach ((string siteName, string instructionFile, string outputDir) in runs)
         {
+            using var __ = _logger.BeginScope(siteName);
+
             // Parse instruction file
             string parameters = await _instructionParser.ParseInstructionFileAsync(instructionFile);
             
@@ -252,6 +253,7 @@ public class ImportHandler
             }
 
             // Create dataset
+            _logger.LogInformation("Creating dataset");
             int datasetId = await CreateDataset(
                 options.Name,
                 options.Description,
@@ -264,6 +266,7 @@ public class ImportHandler
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
             {
+                using var ___ = _logger.BeginScope(Path.GetFileName(outputFile));
                 if (IsStaleFile(outputFile, mostRecentWriteTime))
                 {
                     EmitStaleFileWarning(outputFile, mostRecentWriteTime);

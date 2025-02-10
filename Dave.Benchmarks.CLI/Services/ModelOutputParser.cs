@@ -41,9 +41,7 @@ public class ModelOutputParser
     /// <returns>A task representing the parse operation.</returns>
     public async Task<Quantity> ParseOutputFileAsync(string filePath)
     {
-        logger.LogInformation("Parsing output file: {filePath}", filePath);
-
-        using var _ = logger.BeginScope("{fileName}", Path.GetFileName(filePath));
+        logger.LogDebug("Parsing output file: {filePath}", filePath);
 
         try
         {
