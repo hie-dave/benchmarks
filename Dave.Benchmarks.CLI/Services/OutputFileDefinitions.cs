@@ -73,12 +73,15 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "file_dave_belowground_nmass", "Below-ground N Mass", "Daily below-ground N biomass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_indiv_npp", "Individual NPP", "Daily NPP", "gC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_sla", "Specific Leaf Area", "Daily specific leaf area", "m2/kgC", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_cmass_leaf", "Leaf C Mass", "Daily leaf carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_cmass_leaf_brown", "Brown Leaf C Mass", "Daily brown leaf carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_leaf", "Leaf N Mass", "Daily leaf nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_cmass_crown", "Crown C Mass", "Daily crown carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_cmass_repr", "Reproductive C Mass", "Daily reproductive carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_cmass_root", "Root C Mass", "Daily root carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_root", "Root N Mass", "Daily root nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass", "Vegetation Nitrogen Mass", "Daily PFT-level total nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_cmass_storage", "Storage C Mass", "Daily storage carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_cmass_storage_max", "Max Storage C Mass", "Daily maximum storage carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_storage", "Storage N Mass", "Daily storage nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_nmass_storage_max", "Max Storage N Mass", "Daily maximum storage nitrogen mass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
@@ -122,7 +125,7 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "file_dave_met_subdaily_insol", "Subdaily Insolation", "Subdaily insolation", "W/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_met_subdaily_precip", "Subdaily Precipitation", "Subdaily precipitation", "mm/h", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_met_subdaily_pressure", "Subdaily Pressure", "Subdaily atmospheric pressure", "kPa", AggregationLevel.Patch, TemporalResolution.Daily);
-        AddPftOutput(builder, "file_dave_met_subdaily_co", "Subdaily CO2", "Subdaily atmospheric CO2 concentration", "ppm", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_met_subdaily_co2", "Subdaily CO2", "Subdaily atmospheric CO2 concentration", "ppm", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_anetps_ff_max", "Max Forest Floor Net Photosynthesis", "Maximum daily forest floor net photosynthesis", "gC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
 
         // Daily individual-level outputs.
