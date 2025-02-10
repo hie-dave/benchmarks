@@ -108,7 +108,20 @@ public class ModelOutputParser
                 DateTime timestamp = point.Timestamp;
                 if (metadata.TemporalResolution == TemporalResolution.Monthly)
                 {
-                    int month = TimeUtils.GetMonth(name);
+                    int month;
+                    try
+                    {
+                        month = TimeUtils.GetMonth(name);
+                    }
+                    catch (ArgumentException e)
+                    {
+                        if (metadata.Layers is StaticLayers s && ModelConstants.MonthCols.All(s.IsDataLayer))
+                            // File has Jan..Dec plus some additional layers.
+                            // E.g. file_mald has Jan..Dec plus MAXALD.
+                            month = 12;
+                        else
+                            throw;
+                    }
 
                     // Last day of month.
                     timestamp = new DateTime(point.Timestamp.Year, month, 1).AddMonths(1).AddDays(-1);

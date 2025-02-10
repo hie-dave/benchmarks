@@ -300,14 +300,14 @@ public static class OutputFileDefinitions
         ], AggregationLevel.Gridcell, TemporalResolution.Annual);
 
         AddPftOutput(builder, "file_clitter", "Carbon Litter", "Carbon in litter (kgC/m2)", "kgC/m2", AggregationLevel.Gridcell, TemporalResolution.Annual);
-        AddOutput(builder, "file_tot_runoff", "Runoff", "Total runoff (mm/year)", "mm/year", [
+        AddOutput(builder, "file_runoff", "Runoff", "Total runoff (mm/year)", "mm/year", [
             "Surf",
             "Drain",
             "Base",
             "Total"], AggregationLevel.Gridcell, TemporalResolution.Annual);
 
         AddOutput(builder, "file_wetland_water_added", "Wetland Water Added", "Water added to wetland (mm)", "mm", ["H2OAdded"], AggregationLevel.Gridcell, TemporalResolution.Annual);
-        AddPftOutput(builder, "file_speciesheight", "Species Height", "Mean Species Height", "m", AggregationLevel.Gridcell, TemporalResolution.Annual);
+        AddPftOutput(builder, "file_speciesheights", "Species Height", "Mean Species Height", "m", AggregationLevel.Gridcell, TemporalResolution.Annual);
         AddPftOutput(builder, "file_speciesdiam", "Species Diameter", "Mean species diameter", "m", AggregationLevel.Gridcell, TemporalResolution.Annual);
         AddOutput(builder, "file_firert", "Fire Return Time", "Fire return time", [
             ("FireRT", "years"),
@@ -362,9 +362,18 @@ public static class OutputFileDefinitions
             "Total"
         ], AggregationLevel.Gridcell, TemporalResolution.Annual);
 
-        AddPftOutput(builder, "file_aiso", "Annual Isoprene", "Annual isoprene flux (mgC/m2/year)", "mgC/m2/year", AggregationLevel.Gridcell, TemporalResolution.Annual);
-        AddPftOutput(builder, "file_amon", "Annual Monoterpene", "Annual monoterpene flux (mgC/m2/year)", "mgC/m2/year", AggregationLevel.Gridcell, TemporalResolution.Annual);
-        AddPftOutput(builder, "file_amon_mt1", "Annual Endocyclic Monoterpene", "Annual endocyclic monoterpene flux (mgC/m2/year)", "mgC/m2/year", AggregationLevel.Gridcell, TemporalResolution.Annual);
+        AddPftOutput(builder, "file_aiso", "Isoprene Flux", "Annual Isoprene Flux (mgC/m2/year)", "mgC/m2/year", AggregationLevel.Gridcell, TemporalResolution.Annual);
+        AddPftOutput(builder, "file_amon", "Monoterpene Flux", "Annual Monoterpene Flux (mgC/m2/year)", "mgC/m2/year", AggregationLevel.Gridcell, TemporalResolution.Annual);
+        AddPftOutput(builder, "file_amon_mt1", "Endocyclic Monoterpene Flux", "Annual Endocyclic Monoterpene Flux (mgC/m2/year)", "mgC/m2/year", AggregationLevel.Gridcell, TemporalResolution.Annual);
+        AddPftOutput(builder, "file_amon_mt2", "Other Monoterpene Flux", "Annual Other Monoterpene Flux (mgC/m2/year)", "mgC/m2/year", AggregationLevel.Gridcell, TemporalResolution.Annual);
+        AddOutput(builder, "file_aburned_area_out", "BLAZE Burned Area", "Annual BLAZE Burned Area", [("BurntFr", "0-1")], AggregationLevel.Gridcell, TemporalResolution.Annual);
+        AddOutput(builder, "file_simfireanalysis_out", "SIMFIRE Analytics", "Annual SIMFIRE Analytics", [
+            ("Biome", @"0=NOVEG, 1=CROP, 2=NEEDLELEAF, 3=BROADLEAF, 4=MIXED_FOREST, 5=SHRUBS, 6=SAVANNA, 7=TUNDRA, 8=BARREN"),
+            ("MxNest", "-"),
+            ("PopDens", "inhabitants/km2"),
+            ("AMxFApar", "0-1"),
+            ("FireProb", "0-1"),
+            ("Region", "unused")], AggregationLevel.Gridcell, TemporalResolution.Annual);
 
         // Monthly gridcell-level outputs
         AddMonthlyOutput(builder, "file_mnpp", "Monthly NPP", "Monthly Net Primary Production (kgC/m2/month)", "kgC/m2/month", AggregationLevel.Gridcell);
@@ -382,6 +391,34 @@ public static class OutputFileDefinitions
         AddMonthlyOutput(builder, "file_mwcont_lower", "Monthly Lower Water Content", "Monthly lower soil water content (fraction)", "", AggregationLevel.Gridcell);
         AddMonthlyOutput(builder, "file_miso", "Monthly Isoprene", "Monthly isoprene flux (mgC/m2/month)", "mgC/m2/month", AggregationLevel.Gridcell);
         AddMonthlyOutput(builder, "file_mmon", "Monthly Monoterpene", "Monthly monoterpene flux (mgC/m2/month)", "mgC/m2/month", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_mmon_mt1", "Endocyclic Monoterpene Flux", "Monthly Endocyclic Monoterpene Flux", "mgC/m2", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_mmon_mt2", "Other Monoterpene Flux", "Monthly Endocyclic Monoterpene Flux", "mgC/m2", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth5", "Soil temperature (5cm)", "Soil temperature (5cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth15", "Soil temperature (15cm)", "Soil temperature (15cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth25", "Soil temperature (25cm)", "Soil temperature (25cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth35", "Soil temperature (35cm)", "Soil temperature (35cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth45", "Soil temperature (45cm)", "Soil temperature (45cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth55", "Soil temperature (55cm)", "Soil temperature (55cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth65", "Soil temperature (65cm)", "Soil temperature (65cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth75", "Soil temperature (75cm)", "Soil temperature (75cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth85", "Soil temperature (85cm)", "Soil temperature (85cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth95", "Soil temperature (95cm)", "Soil temperature (95cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth105", "Soil temperature (105cm)", "Soil temperature (105cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth115", "Soil temperature (115cm)", "Soil temperature (115cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth125", "Soil temperature (125cm)", "Soil temperature (125cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth135", "Soil temperature (135cm)", "Soil temperature (135cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msoiltempdepth145", "Soil temperature (145cm)", "Soil temperature (145cm)", "degC", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_mch4", "Monthly CH4 emissions, total", "Monthly CH4 emissions, total", "kg C/m2/yr", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_mch4diff", "Monthly CH4 emissions, diffusion", "Monthly CH4 emissions, diffusion", "kg C/m2/yr", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_mch4plan", "Monthly CH4 emissions, plant-mediated", "Monthly CH4 emissions, plant-mediated", "kg C/m2/yr", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_mch4ebull", "Monthly CH4 emissions, ebullition", "Monthly CH4 emissions, ebullition", "kg C/m2/yr", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_msnow", "Monthly snow depth", "Monthly snow depth", "m", AggregationLevel.Gridcell);
+        AddMonthlyOutput(builder, "file_mwtp", "Monthly water table depth", "Monthly water table depth", "m", AggregationLevel.Gridcell);
+        AddOutput(builder, "file_mald", "Monthly active layer depth", "Monthly active layer depth",
+            ModelConstants.MonthCols.Select(c => (c, "m")).Concat(
+                [("MAXALD", "m")]
+            ).ToArray(), AggregationLevel.Gridcell, TemporalResolution.Monthly);
+        AddMonthlyOutput(builder, "file_mburned_area_out", "BLAZE Monthly Burned Area", "BLAZE Monthly Burned Area", "0-1", AggregationLevel.Gridcell);
 
         Definitions = builder.ToImmutable();
     }
@@ -482,12 +519,11 @@ public static class OutputFileDefinitions
     /// <param name="level">The level at which data is aggregated.</param>
     private static void AddMonthlyOutput(ImmutableDictionary<string, OutputFileMetadata>.Builder builder, string fileType, string name, string description, string units, AggregationLevel level)
     {
-        string[] cols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Total"];
         builder.Add(fileType, new OutputFileMetadata(
             fileName: fileType,
             name: name,
             description: description,
-            layers: new StaticLayers(cols.Select(c => (c, new Unit(units))).ToArray(), level, TemporalResolution.Monthly),
+            layers: new StaticLayers(ModelConstants.MonthCols.Select(c => (c, new Unit(units))).ToArray(), level, TemporalResolution.Monthly),
             level: level,
             resolution: TemporalResolution.Monthly));
     }

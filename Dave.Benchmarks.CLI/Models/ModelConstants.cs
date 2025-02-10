@@ -44,6 +44,11 @@ public static class ModelConstants
     public const string IndivLayer = "indiv";
 
     /// <summary>
+    /// Name of the columns used in the monthly output files.
+    /// </summary>
+    public static readonly string[] MonthCols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Total"];
+
+    /// <summary>
     /// Gets the metadata layers for a given aggregation level and temporal resolution.
     /// </summary>
     public static string[] GetMetadataLayers(AggregationLevel level, TemporalResolution resolution)
