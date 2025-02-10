@@ -1,4 +1,5 @@
 using Dave.Benchmarks.Core.Models.Entities;
+using System.Text.Json.Serialization;
 
 namespace Dave.Benchmarks.Core.Models.Importer;
 
@@ -30,7 +31,7 @@ public class Quantity
     /// <summary>
     /// The temporal resolution of the data.
     /// </summary>
-    public TemporalResolution TemporalResolution { get; }
+    public TemporalResolution Resolution { get; }
 
     /// <summary>
     /// For individual-level outputs, maps individual numbers to their PFT names.
@@ -47,6 +48,7 @@ public class Quantity
     /// <param name="level">The level at which data is aggregated.</param>
     /// <param name="resolution">The temporal resolution of the data.</param>
     /// <param name="individualPfts">For individual-level outputs, maps individual numbers to their PFT names.</param>
+    [JsonConstructor]
     public Quantity(
         string name,
         string description,
@@ -59,7 +61,7 @@ public class Quantity
         Description = description;
         Layers = layers;
         Level = level;
-        TemporalResolution = resolution;
+        Resolution = resolution;
         IndividualPfts = individualPfts;
     }
 

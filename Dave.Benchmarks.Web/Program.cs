@@ -15,7 +15,9 @@ builder.Services.AddDbContext<BenchmarksDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection")),
-        mySqlOptions => mySqlOptions.EnableRetryOnFailure()
+        mySqlOptions => mySqlOptions
+            .EnableRetryOnFailure()
+            .MigrationsAssembly("Dave.Benchmarks.Web")
     ));
 
 WebApplication app = builder.Build();

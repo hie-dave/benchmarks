@@ -33,7 +33,7 @@ public class BenchmarksDbContext : DbContext
 
         // Configure dataset discriminator
         modelBuilder.Entity<Dataset>()
-            .HasDiscriminator<string>("Type")
+            .HasDiscriminator<string>("DatasetType")
             .HasValue<PredictionDataset>("Prediction")
             .HasValue<ObservationDataset>("Observation")
             .IsComplete(true);  // Ensures only these two types are allowed
@@ -56,13 +56,29 @@ public class BenchmarksDbContext : DbContext
 
         // Add indexes for common query patterns
         modelBuilder.Entity<GridcellDatum>()
-            .HasIndex(d => new { d.VariableId, d.LayerId, d.Timestamp });
+            .HasIndex(d => d.VariableId);
+        modelBuilder.Entity<GridcellDatum>()
+            .HasIndex(d => d.LayerId);
+        modelBuilder.Entity<GridcellDatum>()
+            .HasIndex(d => d.Timestamp);
         
         modelBuilder.Entity<StandDatum>()
-            .HasIndex(d => new { d.VariableId, d.LayerId, d.StandId, d.Timestamp });
+            .HasIndex(d => d.VariableId);
+        modelBuilder.Entity<StandDatum>()
+            .HasIndex(d => d.LayerId);
+        modelBuilder.Entity<StandDatum>()
+            .HasIndex(d => d.Timestamp);
+        modelBuilder.Entity<StandDatum>()
+            .HasIndex(d => d.StandId);
         
         modelBuilder.Entity<PatchDatum>()
-            .HasIndex(d => new { d.VariableId, d.LayerId, d.StandId, d.PatchId, d.Timestamp });
+            .HasIndex(d => d.VariableId);
+        modelBuilder.Entity<PatchDatum>()
+            .HasIndex(d => d.LayerId);
+        modelBuilder.Entity<PatchDatum>()
+            .HasIndex(d => d.Timestamp);
+        modelBuilder.Entity<PatchDatum>()
+            .HasIndex(d => d.PatchId);
 
         // Configure Individual-level data
         modelBuilder.Entity<Pft>()
@@ -90,6 +106,12 @@ public class BenchmarksDbContext : DbContext
             .HasForeignKey(d => d.IndividualId);
 
         modelBuilder.Entity<IndividualDatum>()
-            .HasIndex(d => new { d.VariableId, d.LayerId, d.IndividualId, d.Timestamp });
+            .HasIndex(d => d.VariableId);
+        modelBuilder.Entity<IndividualDatum>()
+            .HasIndex(d => d.LayerId);
+        modelBuilder.Entity<IndividualDatum>()
+            .HasIndex(d => d.IndividualId);
+        modelBuilder.Entity<IndividualDatum>()
+            .HasIndex(d => d.Timestamp);
     }
 }
