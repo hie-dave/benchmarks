@@ -1,4 +1,6 @@
+using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Models.Entities;
@@ -215,7 +217,19 @@ public class ImportHandler
         _logger.LogInformation("Importing {File}", Path.GetFileName(outputFile));
 
         string endpoint = string.Format(addEndpoint, datasetId);
+
+        // Log the request size
+        string jsonContent = JsonSerializer.Serialize(quantity);
+        double sizeInMb = jsonContent.Length / (1024.0 * 1024.0);
+        _logger.LogDebug("Request size: {Size:F2} MiB", sizeInMb);
+        _logger.LogDebug("Layers: {Layers}", quantity.Layers.Select(l => $"{l.Name} ({l.Unit})").Aggregate((a, b) => $"{a}, {b}"));
+
         var response = await _httpClient.PostAsJsonAsync(endpoint, quantity);
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            string content = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Server returned {Code}: {Content}", response.StatusCode, content);
+        }
         response.EnsureSuccessStatusCode();
     }
 
@@ -283,6 +297,18 @@ public class ImportHandler
         IEnumerable<string> allFiles = runs.SelectMany(r => EnumerateOutputFiles(r.Item3));
         DateTime globalTimestamp = GetMostRecentWriteTime(allFiles.ToArray());
 
+        // Create dataset
+        _logger.LogInformation("Creating dataset");
+        int datasetId = await CreateDataset(
+            options.Name,
+            options.Description,
+            parameters,
+            repoInfo,
+            options.ClimateDataset,
+            siteLevelSpatialResolution,
+            options.TemporalResolution,
+            options.DryRun);
+
         foreach ((string siteName, string instructionFile, string outputDir) in runs)
         {
             using var __ = _logger.BeginScope(siteName);
@@ -310,18 +336,6 @@ public class ImportHandler
                 _logger.LogWarning("Site {siteName} is stale (age: {age})", siteName, TimeUtils.FormatTimeSpan(globalTimestamp - mostRecentWriteTime));
                 continue;
             }
-
-            // Create dataset
-            _logger.LogInformation("Creating dataset");
-            int datasetId = await CreateDataset(
-                options.Name,
-                options.Description,
-                parameters,
-                repoInfo,
-                options.ClimateDataset,
-                siteLevelSpatialResolution,
-                options.TemporalResolution,
-                options.DryRun);
 
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)

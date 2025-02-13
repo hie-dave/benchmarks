@@ -46,6 +46,9 @@ public class PredictionsController : ControllerBase
     [HttpPost("{datasetId}/add")]
     public async Task<ActionResult> AddQuantity(int datasetId, [FromBody] Quantity quantity)
     {
+        logger.LogInformation("Adding quantity {name} to dataset {DatasetId}", quantity.Name, datasetId);
+        using var _ = logger.BeginScope($"add {quantity.Name}");
+
         Dataset? dataset = await _dbContext.Datasets
             .Include(d => d.Variables)
             .FirstOrDefaultAsync(d => d.Id == datasetId);
@@ -57,7 +60,10 @@ public class PredictionsController : ControllerBase
         if (quantity.Level == AggregationLevel.Individual)
         {
             if (quantity.IndividualPfts == null)
+            {
+                logger.LogInformation("Quantity is an individual-level output, but does not contain PFT mappings");
                 return BadRequest("Individual-level data must include PFT mappings");
+            }
 
             try
             {
@@ -65,11 +71,13 @@ public class PredictionsController : ControllerBase
             }
             catch (InvalidOperationException ex)
             {
+                logger.LogInformation(ex, "Invalid request: {Message}", ex.Message);
                 return BadRequest(ex.Message);
             }
         }
         else if (quantity.IndividualPfts != null)
         {
+            logger.LogInformation("Quantity is not an individual-level output, but does include PFT mappings");
             return BadRequest("Non-individual-level data should not include PFT mappings");
         }
 
@@ -194,6 +202,7 @@ public class PredictionsController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync();
+        logger.LogDebug("Successfully added quantity {name} to dataset {DatasetId}", quantity.Name, datasetId);
         return Ok();
     }
 

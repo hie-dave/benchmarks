@@ -232,7 +232,7 @@ public static class OutputFileDefinitions
         AddOutput(builder, "file_dave_gpp", "GPP", "Daily gross primary production", "gC/m2/day", ["gpp"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_npp", "NPP", "Daily net primary production", "gC/m2/day", ["npp"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_nee", "NEE", "Daily net ecosystem exchange", "gC/m2/day", ["nee"], AggregationLevel.Patch, TemporalResolution.Daily);
-        AddOutput(builder, "file_dave_evaporation", "Evaporation", "Daily evaporation", "mm/day", ["evap"], AggregationLevel.Patch, TemporalResolution.Daily);
+        AddOutput(builder, "file_dave_evaporation", "Evaporation", "Daily evaporation", "mm/day", ["evaporation", "interception", "transpiration", "evapotranspiration"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_soilc", "Soil Carbon", "Daily soil carbon content", "kgC/m2", ["soilc"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_soiln", "Soil Nitrogen", "Daily soil nitrogen content", "kgN/m2", ["soiln"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_soil_nflux", "Soil N Flux", "Daily soil nitrogen flux", "kgN/m2/day", ["nflux"], AggregationLevel.Patch, TemporalResolution.Daily);
@@ -465,7 +465,7 @@ public static class OutputFileDefinitions
             fileName: fileType,
             name: name,
             description: description,
-            layers: new StaticLayers(layers.Select(l => (l.layer, new Unit(l.units))).ToArray(), level, resolution),
+            layers: new StaticLayers(layers.ToDictionary(l => l.layer, l => new Unit(l.units)), level, resolution),
             level: level,
             resolution: resolution));
     }
@@ -487,7 +487,7 @@ public static class OutputFileDefinitions
             fileName: fileType,
             name: name,
             description: description,
-            layers: new StaticLayers(layers.Select(l => (l, new Unit(units))).ToArray(), level, resolution),
+            layers: new StaticLayers(layers, new Unit(units), level, resolution),
             level: level,
             resolution: resolution));
     }
@@ -531,7 +531,7 @@ public static class OutputFileDefinitions
             fileName: fileType,
             name: name,
             description: description,
-            layers: new StaticLayers(ModelConstants.MonthCols.Select(c => (c, new Unit(units))).ToArray(), level, TemporalResolution.Monthly),
+            layers: new StaticLayers(ModelConstants.MonthCols, new Unit(units), level, TemporalResolution.Monthly),
             level: level,
             resolution: TemporalResolution.Monthly));
     }
