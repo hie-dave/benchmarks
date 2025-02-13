@@ -24,6 +24,17 @@ public class DataController : Controller
         return View(datasets);
     }
 
+    public async Task<IActionResult> Timeseries()
+    {
+        var datasets = await _dbContext.Datasets
+            .Include(d => d.Variables)
+                .ThenInclude(v => v.Layers)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        return View(datasets);
+    }
+
     [HttpGet("api/data/datasets")]
     public async Task<ActionResult<IEnumerable<Dataset>>> GetDatasets()
     {
@@ -98,7 +109,7 @@ public class DataController : Controller
             .Take(1000) // Limit to prevent overwhelming the browser
             .Select(d => new
             {
-                timestamp = d.Timestamp.ToString("g"),
+                timestamp = d.Timestamp.ToString("O"), // Use ISO 8601 format for reliable parsing
                 variableName = variable.Name,
                 layer = d.LayerName,
                 value = d.Value,
@@ -107,6 +118,37 @@ public class DataController : Controller
             .ToListAsync();
 
         return Ok(data);
+    }
+
+    [HttpGet("api/data/datasets/{datasetId}/variables/{variableId}/timeresolution")]
+    public async Task<ActionResult<object>> GetTimeResolution(int datasetId, int variableId)
+    {
+        var query = _dbContext.GridcellData
+            .Where(d => d.VariableId == variableId)
+            .OrderBy(d => d.Timestamp);
+
+        // Get just the first two timestamps to determine the interval
+        var timestamps = await query
+            .Select(d => d.Timestamp)
+            .Take(2)
+            .ToListAsync();
+
+        if (timestamps.Count < 2)
+            return Ok(new { format = "g" }); // Default format if we don't have enough data
+
+        var interval = timestamps[1] - timestamps[0];
+        string format;
+
+        if (interval.TotalDays >= 365)
+            format = "yyyy"; // Annual
+        else if (interval.TotalDays >= 28)
+            format = "yyyy-MM"; // Monthly
+        else if (interval.TotalHours >= 24)
+            format = "yyyy-MM-dd"; // Daily
+        else
+            format = "g"; // Default format with time
+
+        return Ok(new { format });
     }
 
     [HttpDelete("api/data/datasets/{datasetId}")]

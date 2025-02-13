@@ -1,0 +1,202 @@
+@model IEnumerable<Dave.Benchmarks.Core.Models.Entities.Dataset>
+@{
+    ViewData["Title"] = "Timeseries Plot";
+}
+
+<div class="container mt-4">
+    <h2>Timeseries Plot</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="dataset">Dataset</label>
+                <select class="form-control" id="dataset">
+                    <option value="">Select a dataset...</option>
+                    @foreach (var dataset in Model)
+                    {
+                        <option value="@dataset.Id">@dataset.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="variable">Variable</label>
+                <select class="form-control" id="variable" disabled>
+                    <option value="">Select a variable...</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="layer">Layer</label>
+                <select class="form-control" id="layer" disabled>
+                    <option value="">Select a layer...</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="timeRange">Time Range</label>
+                <input type="text" class="form-control" id="timeRange" disabled />
+            </div>
+        </div>
+    </div>
+
+    <div id="plot" style="width: 100%; height: 600px;"></div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+    
+    <script>
+        $(document).ready(function() {
+            const $dataset = $('#dataset');
+            const $variable = $('#variable');
+            const $layer = $('#layer');
+            const $timeRange = $('#timeRange');
+            
+            let startDate = null;
+            let endDate = null;
+
+            // Initialize date range picker
+            $timeRange.daterangepicker({
+                autoUpdateInput: false,
+                locale: {
+                    cancelLabel: 'Clear'
+                }
+            });
+
+            $timeRange.on('apply.daterangepicker', function(ev, picker) {
+                $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+                startDate = picker.startDate.format('YYYY-MM-DD');
+                endDate = picker.endDate.format('YYYY-MM-DD');
+                updatePlot();
+            });
+
+            $timeRange.on('cancel.daterangepicker', function(ev, picker) {
+                $(this).val('');
+                startDate = null;
+                endDate = null;
+                updatePlot();
+            });
+
+            function updateVariables() {
+                const datasetId = $dataset.val();
+                if (!datasetId) {
+                    $variable.prop('disabled', true).html('<option value="">Select a variable...</option>');
+                    $layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
+                    $timeRange.prop('disabled', true).val('');
+                    Plotly.purge('plot');
+                    return;
+                }
+
+                $.get(`/api/data/datasets/${datasetId}/variables`, function(variables) {
+                    let options = '<option value="">Select a variable...</option>';
+                    variables.forEach(v => {
+                        const optgroup = $('<optgroup>').attr('label', v.name).attr('data-layers', JSON.stringify(v.layers));
+                        optgroup.append($('<option>').val(v.id).text(v.name));
+                        options += optgroup.prop('outerHTML');
+                    });
+                    $variable.html(options).prop('disabled', false);
+                    $layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
+                    $timeRange.prop('disabled', true).val('');
+                    Plotly.purge('plot');
+                });
+            }
+
+            function updateLayers() {
+                const variableId = $variable.val();
+                if (!variableId) {
+                    $layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
+                    $timeRange.prop('disabled', true).val('');
+                    Plotly.purge('plot');
+                    return;
+                }
+
+                const selectedOptgroup = $variable.find('option:selected').parent('optgroup');
+                if (selectedOptgroup.length) {
+                    const layers = JSON.parse(selectedOptgroup.attr('data-layers') || '[]');
+                    let options = '<option value="">All Layers</option>';
+                    layers.forEach(l => {
+                        options += `<option value="${l.id}">${l.name}</option>`;
+                    });
+                    $layer.html(options).prop('disabled', false);
+                    $timeRange.prop('disabled', false);
+                }
+            }
+
+            function updatePlot() {
+                const datasetId = $dataset.val();
+                const variableId = $variable.val();
+                const layerId = $layer.val();
+
+                if (!datasetId || !variableId) return;
+
+                // First get the time resolution
+                $.get(`/api/data/datasets/${datasetId}/variables/${variableId}/timeresolution`, function(resolution) {
+                    // Then get the data and plot with the correct format
+                    let url = `/api/data/datasets/${datasetId}/variables/${variableId}/data`;
+                    const params = new URLSearchParams();
+                    
+                    if (layerId) params.append('layerId', layerId);
+                    if (startDate) params.append('startTime', startDate);
+                    if (endDate) params.append('endTime', endDate);
+                    
+                    if (params.toString()) {
+                        url += '?' + params.toString();
+                    }
+
+                    $.get(url, function(data) {
+                        if (!data || data.length === 0) {
+                            Plotly.purge('plot');
+                            return;
+                        }
+
+                        // Group data by layer
+                        const layerGroups = data.reduce((groups, item) => {
+                            const layer = item.layer || 'Default';
+                            if (!groups[layer]) {
+                                groups[layer] = {
+                                    x: [],
+                                    y: [],
+                                    name: layer,
+                                    type: 'scatter',
+                                    mode: 'lines+markers'
+                                };
+                            }
+                            // Parse timestamp string into Date object
+                            const date = new Date(item.timestamp);
+                            groups[layer].x.push(date);
+                            groups[layer].y.push(item.value);
+                            return groups;
+                        }, {});
+
+                        const traces = Object.values(layerGroups);
+                        const layout = {
+                            title: `${$variable.find('option:selected').text()} over time`,
+                            xaxis: {
+                                title: 'Time',
+                                type: 'date'
+                            },
+                            yaxis: {
+                                title: $variable.find('option:selected').text()
+                            },
+                            showlegend: true
+                        };
+
+                        Plotly.newPlot('plot', traces, layout);
+                    });
+                });
+            }
+
+            // Event handlers
+            $dataset.change(updateVariables);
+            $variable.change(updateLayers);
+            $layer.change(updatePlot);
+        });
+    </script>
+}

@@ -1,11 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using Dave.Benchmarks.Core.Data;
 using Dave.Benchmarks.Core.Logging;
+using System.Text.Json.Serialization;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 
 // Configure logging
 builder.Services.ConfigureLogging();
