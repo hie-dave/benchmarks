@@ -169,34 +169,64 @@ public class ImportHandler
         string climateDataset,
         string spatialResolution,
         string temporalResolution,
-        bool dryRun)
+        bool dryRun,
+        bool isGridded)
     {
-        var request = new CreateDatasetRequest
+        if (isGridded)
         {
-            Name = name,
-            Description = description,
-            ModelVersion = repoInfo.CommitHash,
-            ClimateDataset = climateDataset,
-            SpatialResolution = spatialResolution,
-            TemporalResolution = temporalResolution,
-            CompressedParameters = CompressionUtility.CompressText(parameters),
-            CompressedCodePatches = repoInfo.Patches
-        };
+            var request = new CreateGriddedDatasetRequest
+            {
+                Name = name,
+                Description = description,
+                ModelVersion = repoInfo.CommitHash,
+                ClimateDataset = climateDataset,
+                TemporalResolution = temporalResolution,
+                CompressedCodePatches = repoInfo.Patches,
+                SpatialResolution = spatialResolution
+            };
 
-        if (dryRun)
-        {
-            _logger.LogInformation("[DRY RUN] Dataset {name} will not be created", name);
-            return -1;
+            if (dryRun)
+            {
+                _logger.LogInformation("[DRY RUN] Gridded dataset {name} will not be created", name);
+                return -1;
+            }
+
+            var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<CreateDatasetResponse>();
+            if (result == null)
+                throw new InvalidOperationException("Server returned an empty response when creating dataset");
+                
+            return result.Id;
         }
+        else
+        {
+            var request = new CreateSiteDatasetRequest
+            {
+                Name = name,
+                Description = description,
+                ModelVersion = repoInfo.CommitHash,
+                ClimateDataset = climateDataset,
+                TemporalResolution = temporalResolution,
+                CompressedCodePatches = repoInfo.Patches
+            };
 
-        var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);
-        response.EnsureSuccessStatusCode();
+            if (dryRun)
+            {
+                _logger.LogInformation("[DRY RUN] Site dataset {name} will not be created", name);
+                return -1;
+            }
 
-        var result = await response.Content.ReadFromJsonAsync<CreateDatasetResponse>();
-        if (result == null)
-            throw new InvalidOperationException("Server returned an empty response when creating dataset");
-            
-        return result.Id;
+            var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<CreateDatasetResponse>();
+            if (result == null)
+                throw new InvalidOperationException("Server returned an empty response when creating dataset");
+                
+            return result.Id;
+        }
     }
 
     private async Task ImportOutputFile(int datasetId, string outputFile, bool dryRun)
@@ -218,13 +248,35 @@ public class ImportHandler
 
         string endpoint = string.Format(addEndpoint, datasetId);
 
+        // Create the appropriate request type based on the quantity level
+        object request;
+        if (quantity.Level == AggregationLevel.Site)
+        {
+            request = new AddSiteRequest
+            {
+                Name = Path.GetFileNameWithoutExtension(outputFile),
+                InstructionFile = await File.ReadAllBytesAsync(outputFile),
+                Latitude = quantity.Latitude ?? throw new InvalidOperationException("Site-level quantity must have latitude"),
+                Longitude = quantity.Longitude ?? throw new InvalidOperationException("Site-level quantity must have longitude")
+            };
+        }
+        else
+        {
+            request = new AddGriddedRunRequest
+            {
+                InstructionFile = await File.ReadAllBytesAsync(outputFile),
+                GcmName = quantity.GcmName ?? throw new InvalidOperationException("Gridded quantity must have GCM name"),
+                EmissionsScenario = quantity.EmissionsScenario ?? throw new InvalidOperationException("Gridded quantity must have emissions scenario")
+            };
+        }
+
         // Log the request size
-        string jsonContent = JsonSerializer.Serialize(quantity);
+        string jsonContent = JsonSerializer.Serialize(request);
         double sizeInMb = jsonContent.Length / (1024.0 * 1024.0);
         _logger.LogDebug("Request size: {Size:F2} MiB", sizeInMb);
         _logger.LogDebug("Layers: {Layers}", quantity.Layers.Select(l => $"{l.Name} ({l.Unit})").Aggregate((a, b) => $"{a}, {b}"));
 
-        var response = await _httpClient.PostAsJsonAsync(endpoint, quantity);
+        var response = await _httpClient.PostAsJsonAsync(endpoint, request);
         if (response.StatusCode != HttpStatusCode.OK)
         {
             string content = await response.Content.ReadAsStringAsync();
@@ -266,7 +318,8 @@ public class ImportHandler
             options.ClimateDataset,
             options.SpatialResolution,
             options.TemporalResolution,
-            options.DryRun);
+            options.DryRun,
+            true);
 
         // Process each output file, skipping stale ones
         foreach (string outputFile in outputFiles)
@@ -297,18 +350,6 @@ public class ImportHandler
         IEnumerable<string> allFiles = runs.SelectMany(r => EnumerateOutputFiles(r.Item3));
         DateTime globalTimestamp = GetMostRecentWriteTime(allFiles.ToArray());
 
-        // Create dataset
-        _logger.LogInformation("Creating dataset");
-        int datasetId = await CreateDataset(
-            options.Name,
-            options.Description,
-            parameters,
-            repoInfo,
-            options.ClimateDataset,
-            siteLevelSpatialResolution,
-            options.TemporalResolution,
-            options.DryRun);
-
         foreach ((string siteName, string instructionFile, string outputDir) in runs)
         {
             using var __ = _logger.BeginScope(siteName);
@@ -337,6 +378,19 @@ public class ImportHandler
                 continue;
             }
 
+            // Create dataset
+            _logger.LogInformation("Creating dataset");
+            int datasetid = await CreateDataset(
+                options.Name,
+                options.Description,
+                parameters,
+                repoInfo,
+                options.ClimateDataset,
+                siteLevelSpatialResolution,
+                options.TemporalResolution,
+                options.DryRun,
+                false);
+
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
             {
@@ -348,7 +402,7 @@ public class ImportHandler
                 }
 
                 string variableName = Path.GetFileNameWithoutExtension(outputFile);
-                await ImportOutputFile(datasetId, outputFile, options.DryRun);
+                await ImportOutputFile(datasetid, outputFile, options.DryRun);
             }
         }
     }

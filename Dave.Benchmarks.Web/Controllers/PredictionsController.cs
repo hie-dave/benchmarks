@@ -21,19 +21,18 @@ public class PredictionsController : ControllerBase
         this.logger = logger;
     }
 
-    [HttpPost("create")]
-    public async Task<ActionResult<PredictionDataset>> Create([FromBody] CreateDatasetRequest request)
+    [HttpPost("site/create")]
+    public async Task<ActionResult<SiteRunDataset>> CreateSiteDataset(
+        [FromBody] CreateSiteDatasetRequest request)
     {
-        var dataset = new PredictionDataset
+        SiteRunDataset dataset = new()
         {
             Name = request.Name,
             Description = request.Description,
             CreatedAt = DateTime.UtcNow,
             ModelVersion = request.ModelVersion,
             ClimateDataset = request.ClimateDataset,
-            SpatialResolution = request.SpatialResolution,
             TemporalResolution = request.TemporalResolution,
-            Parameters = request.CompressedParameters,
             Patches = request.CompressedCodePatches
         };
 
@@ -43,10 +42,101 @@ public class PredictionsController : ControllerBase
         return Ok(dataset);
     }
 
-    [HttpPost("{datasetId}/add")]
-    public async Task<ActionResult> AddQuantity(int datasetId, [FromBody] Quantity quantity)
+    [HttpPost("gridded/create")]
+    public async Task<ActionResult<GriddedDataset>> CreateGriddedDataset(
+        [FromBody] CreateGriddedDatasetRequest request)
     {
-        logger.LogInformation("Adding quantity {name} to dataset {DatasetId}", quantity.Name, datasetId);
+        GriddedDataset dataset = new()
+        {
+            Name = request.Name,
+            Description = request.Description,
+            CreatedAt = DateTime.UtcNow,
+            ModelVersion = request.ModelVersion,
+            ClimateDataset = request.ClimateDataset,
+            TemporalResolution = request.TemporalResolution,
+            SpatialExtent = request.SpatialExtent,
+            SpatialResolution = request.SpatialResolution,
+            Patches = request.CompressedCodePatches
+        };
+
+        _dbContext.Datasets.Add(dataset);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(dataset);
+    }
+
+    [HttpPost("site/{datasetId}/add")]
+    public async Task<ActionResult> AddSite(
+        int datasetId,
+        [FromBody] AddSiteRequest request)
+    {
+        logger.LogInformation(
+            "Adding site {name} to dataset {DatasetId}",
+            request.Name,
+            datasetId);
+
+        Dataset? dataset = await _dbContext.Datasets
+            .FirstOrDefaultAsync(d => d.Id == datasetId);
+
+        if (dataset is not SiteRunDataset siteDataset)
+            return BadRequest("Dataset is not a site run dataset");
+
+        SiteRun site = new()
+        {
+            Name = request.Name,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            DatasetId = datasetId,
+        };
+        site.SetCompressedInstructions(request.InstructionFile);
+
+        _dbContext.SiteRuns.Add(site);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok();
+    }
+
+    [HttpPost("gridded/{datasetId}/add")]
+    public async Task<ActionResult> AddGriddedRun(
+        int datasetId,
+        [FromBody] AddGriddedRunRequest request)
+    {
+        logger.LogInformation(
+            "Adding scenario {gcm}/{scenario} to dataset {DatasetId}",
+            request.GcmName,
+            request.EmissionsScenario,
+            datasetId);
+
+        Dataset? dataset = await _dbContext.Datasets
+            .FirstOrDefaultAsync(d => d.Id == datasetId);
+
+        if (dataset is not GriddedDataset griddedDataset)
+            return BadRequest("Dataset is not a gridded dataset");
+
+        ClimateScenario scenario = new()
+        {
+            GcmName = request.GcmName,
+            EmissionsScenario = request.EmissionsScenario,
+            DatasetId = datasetId,
+        };
+        scenario.SetCompressedInstructions(request.InstructionFile);
+
+        _dbContext.ClimateScenarios.Add(scenario);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok();
+    }
+
+    [HttpPost("{datasetId}/add")]
+    public async Task<ActionResult> AddQuantity(
+        int datasetId,
+        [FromBody] Quantity quantity)
+    {
+        logger.LogInformation(
+            "Adding quantity {name} to dataset {DatasetId}",
+            quantity.Name,
+            datasetId);
+
         using var _ = logger.BeginScope($"add {quantity.Name}");
 
         Dataset? dataset = await _dbContext.Datasets
@@ -127,9 +217,9 @@ public class PredictionsController : ControllerBase
             switch (quantity.Level)
             {
                 case AggregationLevel.Gridcell:
-                    foreach (var point in layerData.Data)
+                    foreach (DataPoint point in layerData.Data)
                     {
-                        var datum = new GridcellDatum
+                        GridcellDatum datum = new()
                         {
                             Variable = variable,
                             Layer = layer,
@@ -143,9 +233,9 @@ public class PredictionsController : ControllerBase
                     break;
 
                 case AggregationLevel.Stand:
-                    foreach (var point in layerData.Data)
+                    foreach (DataPoint point in layerData.Data)
                     {
-                        var datum = new StandDatum
+                        StandDatum datum = new()
                         {
                             Variable = variable,
                             Layer = layer,
@@ -160,9 +250,9 @@ public class PredictionsController : ControllerBase
                     break;
 
                 case AggregationLevel.Patch:
-                    foreach (var point in layerData.Data)
+                    foreach (DataPoint point in layerData.Data)
                     {
-                        var datum = new PatchDatum
+                        PatchDatum datum = new()
                         {
                             Variable = variable,
                             Layer = layer,
@@ -178,9 +268,9 @@ public class PredictionsController : ControllerBase
                     break;
 
                 case AggregationLevel.Individual:
-                    foreach (var point in layerData.Data)
+                    foreach (DataPoint point in layerData.Data)
                     {
-                        var datum = new IndividualDatum
+                        IndividualDatum datum = new()
                         {
                             Variable = variable,
                             Layer = layer,
@@ -223,7 +313,7 @@ public class PredictionsController : ControllerBase
         // Check for inconsistencies with existing mappings
         foreach (var (indivNumber, pftName) in mappings)
         {
-            if (existingMappings.TryGetValue(indivNumber, out var existingPft) && existingPft != pftName)
+            if (existingMappings.TryGetValue(indivNumber, out string? existingPft) && existingPft != pftName)
             {
                 throw new InvalidOperationException(
                     $"Inconsistent PFT mapping: Individual {indivNumber} is mapped to '{pftName}' " +
@@ -232,10 +322,10 @@ public class PredictionsController : ControllerBase
         }
 
         // Get or create PFTs
-        var pftMap = new Dictionary<string, Pft>();
-        foreach (var pftName in mappings.Values.Distinct())
+        Dictionary<string, Pft> pftMap = new();
+        foreach (string pftName in mappings.Values.Distinct())
         {
-            var pft = await _dbContext.Pfts.FirstOrDefaultAsync(p => p.Name == pftName);
+            Pft? pft = await _dbContext.Pfts.FirstOrDefaultAsync(p => p.Name == pftName);
             if (pft == null)
             {
                 pft = new Pft { Name = pftName };
@@ -245,7 +335,7 @@ public class PredictionsController : ControllerBase
         }
 
         // Create new individuals (only for those not already in database)
-        var newIndivs = mappings
+        IEnumerable<Individual> newIndivs = mappings
             .Where(kvp => !existingMappings.ContainsKey(kvp.Key))
             .Select(kvp => new Individual
             {

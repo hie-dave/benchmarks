@@ -22,6 +22,8 @@ public class BenchmarksDbContext : DbContext
     public DbSet<Pft> Pfts { get; set; } = null!;
     public DbSet<Individual> Individuals { get; set; } = null!;
     public DbSet<IndividualDatum> IndividualData { get; set; } = null!;
+    public DbSet<SiteRun> SiteRuns { get; set; } = null!;
+    public DbSet<ClimateScenario> ClimateScenarios { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,9 +36,10 @@ public class BenchmarksDbContext : DbContext
         // Configure dataset discriminator
         modelBuilder.Entity<Dataset>()
             .HasDiscriminator<string>("DatasetType")
-            .HasValue<PredictionDataset>("Prediction")
             .HasValue<ObservationDataset>("Observation")
-            .IsComplete(true);  // Ensures only these two types are allowed
+            .HasValue<SiteRunDataset>("SiteRun")
+            .HasValue<GriddedDataset>("Gridded")
+            .IsComplete(true);  // Ensures only these three types are allowed
 
         // Configure relationships
         modelBuilder.Entity<Variable>()
@@ -53,6 +56,24 @@ public class BenchmarksDbContext : DbContext
             .HasOne(l => l.Variable)
             .WithMany(v => v.Layers)
             .HasForeignKey(l => l.VariableId);
+
+        // Configure relationships for site runs
+        modelBuilder.Entity<SiteRun>()
+            .HasOne(s => s.Dataset)
+            .WithMany(d => d.Sites)
+            .HasForeignKey(s => s.DatasetId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Configure relationships for climate scenarios
+        modelBuilder.Entity<ClimateScenario>()
+            .HasOne(c => c.Dataset)
+            .WithMany(d => d.ClimateScenarios)
+            .HasForeignKey(c => c.DatasetId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Configure instruction file storage
+        modelBuilder.Entity<Simulation>()
+            .Property<byte[]>("InstructionFile");
 
         // Add indexes for common query patterns
         modelBuilder.Entity<GridcellDatum>()

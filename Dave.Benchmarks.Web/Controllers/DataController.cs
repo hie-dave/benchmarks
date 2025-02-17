@@ -43,128 +43,99 @@ public class DataController : Controller
             .AsSplitQuery()
             .ToListAsync();
 
-        // Ensure proper type information is preserved
+        // Load type-specific navigation properties
         foreach (var dataset in datasets)
         {
-            if (dataset is PredictionDataset prediction)
+            switch (dataset)
             {
-                // Load prediction-specific navigation properties if needed
-            }
-            else if (dataset is ObservationDataset observation)
-            {
-                // Load observation-specific navigation properties if needed
+                case SiteRunDataset siteDataset:
+                    await _dbContext.Entry(siteDataset)
+                        .Collection(d => d.Sites)
+                        .LoadAsync();
+                    break;
+
+                case GriddedDataset griddedDataset:
+                    await _dbContext.Entry(griddedDataset)
+                        .Collection(d => d.ClimateScenarios)
+                        .LoadAsync();
+                    break;
             }
         }
 
         return Ok(datasets);
     }
 
-    [HttpGet("api/data/datasets/{datasetId}/variables")]
-    public async Task<ActionResult<IEnumerable<Variable>>> GetVariables(int datasetId)
+    [HttpGet("api/data/sites")]
+    public async Task<ActionResult<IEnumerable<SiteRun>>> GetSites(int datasetId)
     {
         var dataset = await _dbContext.Datasets
-            .Include(d => d.Variables)
-                .ThenInclude(v => v.Layers)
             .FirstOrDefaultAsync(d => d.Id == datasetId);
 
-        if (dataset == null)
-            return NotFound($"Dataset {datasetId} not found");
+        if (dataset is not SiteRunDataset siteDataset)
+            return BadRequest("Dataset is not a site run dataset");
 
-        return Ok(dataset.Variables);
+        var sites = await _dbContext.SiteRuns
+            .Where(s => s.DatasetId == datasetId)
+            .ToListAsync();
+
+        return Ok(sites);
     }
 
-    [HttpGet("api/data/datasets/{datasetId}/variables/{variableId}/data")]
-    public async Task<ActionResult<IEnumerable<object>>> GetData(
+    [HttpGet("api/data/scenarios")]
+    public async Task<ActionResult<IEnumerable<ClimateScenario>>> GetScenarios(
+        int datasetId)
+    {
+        var dataset = await _dbContext.Datasets
+            .FirstOrDefaultAsync(d => d.Id == datasetId);
+
+        if (dataset is not GriddedDataset griddedDataset)
+            return BadRequest("Dataset is not a gridded dataset");
+
+        var scenarios = await _dbContext.ClimateScenarios
+            .Where(s => s.DatasetId == datasetId)
+            .ToListAsync();
+
+        return Ok(scenarios);
+    }
+
+    [HttpGet("api/data/variables")]
+    public async Task<ActionResult<IEnumerable<Variable>>> GetVariables(int datasetId)
+    {
+        var variables = await _dbContext.Variables
+            .Include(v => v.Layers)
+            .Where(v => v.DatasetId == datasetId)
+            .ToListAsync();
+
+        return Ok(variables);
+    }
+
+    [HttpGet("api/data/data")]
+    public async Task<ActionResult<IEnumerable<Datum>>> GetData(
         int datasetId,
         int variableId,
-        [FromQuery] int? layerId = null,
-        [FromQuery] DateTime? startTime = null,
-        [FromQuery] DateTime? endTime = null)
+        int? layerId = null)
     {
-        var variable = await _dbContext.Variables
-            .Include(v => v.Layers)
-            .FirstOrDefaultAsync(v => v.Id == variableId && v.DatasetId == datasetId);
-
-        if (variable == null)
-            return NotFound($"Variable {variableId} not found in dataset {datasetId}");
-
         var query = _dbContext.GridcellData
-            .Where(d => d.VariableId == variableId)
-            .Join(_dbContext.VariableLayers,
-                d => d.LayerId,
-                l => l.Id,
-                (d, l) => new { d.Timestamp, d.Value, d.Latitude, d.Longitude, LayerName = l.Name, LayerId = l.Id });
+            .Where(d => d.Variable.DatasetId == datasetId && 
+                       d.VariableId == variableId);
 
         if (layerId.HasValue)
             query = query.Where(d => d.LayerId == layerId.Value);
 
-        if (startTime.HasValue)
-            query = query.Where(d => d.Timestamp >= startTime.Value);
-
-        if (endTime.HasValue)
-            query = query.Where(d => d.Timestamp <= endTime.Value);
-
-        var data = await query
-            .OrderBy(d => d.Timestamp)
-            .Take(1000) // Limit to prevent overwhelming the browser
-            .Select(d => new
-            {
-                timestamp = d.Timestamp.ToString("O"), // Use ISO 8601 format for reliable parsing
-                variableName = variable.Name,
-                layer = d.LayerName,
-                value = d.Value,
-                location = $"({d.Latitude:F2}, {d.Longitude:F2})"
-            })
-            .ToListAsync();
-
+        var data = await query.ToListAsync();
         return Ok(data);
     }
 
-    [HttpGet("api/data/datasets/{datasetId}/variables/{variableId}/timeresolution")]
-    public async Task<ActionResult<object>> GetTimeResolution(int datasetId, int variableId)
+    [HttpDelete("api/data/datasets/{id}")]
+    public async Task<ActionResult> DeleteDataset(int id)
     {
-        var query = _dbContext.GridcellData
-            .Where(d => d.VariableId == variableId)
-            .OrderBy(d => d.Timestamp);
-
-        // Get just the first two timestamps to determine the interval
-        var timestamps = await query
-            .Select(d => d.Timestamp)
-            .Take(2)
-            .ToListAsync();
-
-        if (timestamps.Count < 2)
-            return Ok(new { format = "g" }); // Default format if we don't have enough data
-
-        var interval = timestamps[1] - timestamps[0];
-        string format;
-
-        if (interval.TotalDays >= 365)
-            format = "yyyy"; // Annual
-        else if (interval.TotalDays >= 28)
-            format = "yyyy-MM"; // Monthly
-        else if (interval.TotalHours >= 24)
-            format = "yyyy-MM-dd"; // Daily
-        else
-            format = "g"; // Default format with time
-
-        return Ok(new { format });
-    }
-
-    [HttpDelete("api/data/datasets/{datasetId}")]
-    public async Task<IActionResult> DeleteDataset(int datasetId)
-    {
-        var dataset = await _dbContext.Datasets
-            .Include(d => d.Variables)
-                .ThenInclude(v => v.Layers)
-            .FirstOrDefaultAsync(d => d.Id == datasetId);
-
+        var dataset = await _dbContext.Datasets.FindAsync(id);
         if (dataset == null)
             return NotFound();
 
         _dbContext.Datasets.Remove(dataset);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new { success = true });
+        return Ok();
     }
 }
