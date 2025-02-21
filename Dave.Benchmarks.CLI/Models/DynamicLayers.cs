@@ -1,5 +1,6 @@
 namespace Dave.Benchmarks.CLI.Models;
 
+using Dave.Benchmarks.Core.Models;
 using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 

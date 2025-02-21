@@ -22,7 +22,7 @@ public class PredictionsController : ControllerBase
     }
 
     [HttpPost("site/create")]
-    public async Task<ActionResult<SiteRunDataset>> CreateSiteDataset(
+    public async Task<ActionResult<int>> CreateSiteDataset(
         [FromBody] CreateSiteDatasetRequest request)
     {
         SiteRunDataset dataset = new()
@@ -39,11 +39,11 @@ public class PredictionsController : ControllerBase
         _dbContext.Datasets.Add(dataset);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(dataset);
+        return Ok(dataset.Id);
     }
 
     [HttpPost("gridded/create")]
-    public async Task<ActionResult<GriddedDataset>> CreateGriddedDataset(
+    public async Task<ActionResult<int>> CreateGriddedDataset(
         [FromBody] CreateGriddedDatasetRequest request)
     {
         GriddedDataset dataset = new()
@@ -62,11 +62,11 @@ public class PredictionsController : ControllerBase
         _dbContext.Datasets.Add(dataset);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(dataset);
+        return Ok(dataset.Id);
     }
 
     [HttpPost("site/{datasetId}/add")]
-    public async Task<ActionResult> AddSite(
+    public async Task<ActionResult<int>> AddSite(
         int datasetId,
         [FromBody] AddSiteRequest request)
     {
@@ -93,11 +93,11 @@ public class PredictionsController : ControllerBase
         _dbContext.SiteRuns.Add(site);
         await _dbContext.SaveChangesAsync();
 
-        return Ok();
+        return Ok(site.Id);
     }
 
     [HttpPost("gridded/{datasetId}/add")]
-    public async Task<ActionResult> AddGriddedRun(
+    public async Task<ActionResult<int>> AddGriddedRun(
         int datasetId,
         [FromBody] AddGriddedRunRequest request)
     {
@@ -124,7 +124,7 @@ public class PredictionsController : ControllerBase
         _dbContext.ClimateScenarios.Add(scenario);
         await _dbContext.SaveChangesAsync();
 
-        return Ok();
+        return Ok(scenario.Id);
     }
 
     [HttpPost("{datasetId}/add")]

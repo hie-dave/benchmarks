@@ -30,10 +30,19 @@ builder.Services.AddTransient<CommandRunner>();
 builder.Services.AddTransient<ImportHandler>();
 builder.Services.AddSingleton<IOutputFileTypeResolver, OutputFileTypeResolver>();
 
-builder.Services.AddHttpClient<ImportHandler>((sp, client) =>
+// Configure HTTP client and API client
+builder.Services.AddHttpClient<ProductionApiClient>((sp, client) =>
 {
     ApiSettings settings = sp.GetRequiredService<ApiSettings>();
     client.BaseAddress = new Uri(settings.WebApiUrl);
+});
+
+builder.Services.AddScoped<IApiClient>(sp =>
+{
+    var opts = sp.GetRequiredService<IOptions<OptionsBase>>().Value;
+    if (opts.DryRun)
+        return sp.GetRequiredService<DryRunApiClient>();
+    return sp.GetRequiredService<ProductionApiClient>();
 });
 
 // Configure logging

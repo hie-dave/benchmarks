@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using Dave.Benchmarks.Core.Utilities;
 using LibGit2Sharp;
 using Microsoft.Extensions.Logging;
@@ -15,14 +11,6 @@ public class GitService
     public GitService(ILogger<GitService> logger)
     {
         _logger = logger;
-    }
-
-    public class RepositoryInfo
-    {
-        public string CommitHash { get; set; } = string.Empty;
-        public byte[] Patches { get; set; } = Array.Empty<byte>();
-        public string RepositoryPath { get; set; } = string.Empty;
-        public bool HasUncommittedChanges { get; set; }
     }
 
     public RepositoryInfo GetRepositoryInfo(string repoPath)

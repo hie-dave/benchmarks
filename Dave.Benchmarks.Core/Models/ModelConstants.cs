@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Dave.Benchmarks.Core.Models.Entities;
 
-namespace Dave.Benchmarks.CLI.Models;
+namespace Dave.Benchmarks.Core.Models;
 
 /// <summary>
 /// Constants used throughout the model.
@@ -47,6 +47,17 @@ public static class ModelConstants
     /// Name of the columns used in the monthly output files.
     /// </summary>
     public static readonly string[] MonthCols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Total"];
+
+    /// <summary>
+    /// Name of the parameter that specifies the gridlist file.
+    /// </summary>
+    public static string ParamGridlist = "file_gridlist";
+
+    /// <summary>
+    /// Name of the parameter that specifies the gridlist file when using the
+    /// CF input module.
+    /// </summary>
+    public static string ParamGridlistCf = "file_gridlist_cf";
 
     /// <summary>
     /// Gets the metadata layers for a given aggregation level and temporal resolution.

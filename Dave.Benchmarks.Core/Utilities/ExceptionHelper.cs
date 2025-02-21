@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Dave.Benchmarks.Core.Utilities
@@ -19,6 +20,7 @@ namespace Dave.Benchmarks.Core.Utilities
         /// <param name="callerLineNumber">Automatically captured line number.</param>
         /// <typeparam name="T">The type of exception to throw.</typeparam>
         /// <exception cref="T">Always throws the specified exception type.</exception>
+        [DoesNotReturn]
         public static T Throw<T>(
             ILogger logger,
             string message,
@@ -48,6 +50,7 @@ namespace Dave.Benchmarks.Core.Utilities
         /// <param name="callerLineNumber">Automatically captured line number.</param>
         /// <typeparam name="T">The type of exception to throw.</typeparam>
         /// <exception cref="T">Always throws the specified exception.</exception>
+        [DoesNotReturn]
         public static T Throw<T>(
             ILogger logger,
             T exception,

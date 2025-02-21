@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using Dave.Benchmarks.CLI.Models;
 using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Models.Entities;
@@ -17,25 +19,13 @@ namespace Dave.Benchmarks.CLI.Commands;
 /// </summary>
 public class ImportHandler
 {
-    // Site-level runs are point-scale by definition.
-    private const string siteLevelSpatialResolution = "Point";
-
-    /// <summary>
-    /// API endpoint used to upload data to a dataset.
-    /// </summary>
-    private const string addEndpoint = "api/predictions/{0}/add";
-
-    /// <summary>
-    /// API endpoint used to create a dataset.
-    /// </summary>
-    private const string createEndpoint = "api/predictions/create";
-
-    private readonly ILogger<ImportHandler> _logger;
-    private readonly ModelOutputParser _parser;
-    private readonly GitService _gitService;
-    private readonly InstructionFileParser _instructionParser;
-    private readonly HttpClient _httpClient;
-    private readonly IOutputFileTypeResolver _resolver;
+    private readonly ILogger<ImportHandler> logger;
+    private readonly ModelOutputParser parser;
+    private readonly GitService git;
+    private readonly InstructionFileParser insParser;
+    private readonly IApiClient apiClient;
+    private readonly IOutputFileTypeResolver resolver;
+    private readonly GridlistParser gridlistParser;
 
     /// <summary>
     /// Tracks individual-PFT mappings for the current dataset being imported.
@@ -64,18 +54,17 @@ public class ImportHandler
         ModelOutputParser parser,
         GitService gitService,
         InstructionFileParser instructionParser,
-        HttpClient httpClient,
-        IOutputFileTypeResolver resolver)
+        IApiClient apiClient,
+        IOutputFileTypeResolver resolver,
+        GridlistParser gridlistParser)
     {
-        _logger = logger;
-        _parser = parser;
-        _gitService = gitService;
-        _instructionParser = instructionParser;
-        _httpClient = httpClient;
-        _resolver = resolver;
-
-        if (_httpClient.BaseAddress == null)
-            throw new InvalidOperationException("ImportHandler: Base address is null");
+        this.logger = logger;
+        this.parser = parser;
+        git = gitService;
+        insParser = instructionParser;
+        this.apiClient = apiClient;
+        this.resolver = resolver;
+        this.gridlistParser = gridlistParser;
     }
 
     private void ValidateIndivPftMappings(Quantity quantity, string fileName)
@@ -83,7 +72,7 @@ public class ImportHandler
         if (quantity.Level != AggregationLevel.Individual)
         {
             if (quantity.IndividualPfts != null)
-                ExceptionHelper.Throw<InvalidDataException>(_logger, $"File {fileName} is not an indiv-level output, and should therefore not contain indiv-pft mappings");
+                ExceptionHelper.Throw<InvalidDataException>(logger, $"File {fileName} is not an indiv-level output, and should therefore not contain indiv-pft mappings");
             return;
         }
 
@@ -96,7 +85,7 @@ public class ImportHandler
         }
 
         if (quantity.IndividualPfts == null)
-            ExceptionHelper.Throw<InvalidDataException>(_logger, $"File {fileName} is an indiv-level output, but does not contain indiv-pft mappings");
+            ExceptionHelper.Throw<InvalidDataException>(logger, $"File {fileName} is an indiv-level output, but does not contain indiv-pft mappings");
 
         // Compare with existing mapping
         foreach ((int indivId, string pftName) in quantity.IndividualPfts!)
@@ -152,137 +141,13 @@ public class ImportHandler
         FileInfo fileInfo = new(filePath);
         TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
         
-        _logger.LogWarning("Skipping stale output file (age: {age})",
+        logger.LogWarning("Skipping stale output file (age: {age})",
             TimeUtils.FormatTimeSpan(age));
     }
 
     private string[] EnumerateOutputFiles(string directory)
     {
         return Directory.GetFiles(directory, "*.out");
-    }
-
-    private async Task<int> CreateDataset(
-        string name,
-        string description,
-        string parameters,
-        GitService.RepositoryInfo repoInfo,
-        string climateDataset,
-        string spatialResolution,
-        string temporalResolution,
-        bool dryRun,
-        bool isGridded)
-    {
-        if (isGridded)
-        {
-            var request = new CreateGriddedDatasetRequest
-            {
-                Name = name,
-                Description = description,
-                ModelVersion = repoInfo.CommitHash,
-                ClimateDataset = climateDataset,
-                TemporalResolution = temporalResolution,
-                CompressedCodePatches = repoInfo.Patches,
-                SpatialResolution = spatialResolution
-            };
-
-            if (dryRun)
-            {
-                _logger.LogInformation("[DRY RUN] Gridded dataset {name} will not be created", name);
-                return -1;
-            }
-
-            var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<CreateDatasetResponse>();
-            if (result == null)
-                throw new InvalidOperationException("Server returned an empty response when creating dataset");
-                
-            return result.Id;
-        }
-        else
-        {
-            var request = new CreateSiteDatasetRequest
-            {
-                Name = name,
-                Description = description,
-                ModelVersion = repoInfo.CommitHash,
-                ClimateDataset = climateDataset,
-                TemporalResolution = temporalResolution,
-                CompressedCodePatches = repoInfo.Patches
-            };
-
-            if (dryRun)
-            {
-                _logger.LogInformation("[DRY RUN] Site dataset {name} will not be created", name);
-                return -1;
-            }
-
-            var response = await _httpClient.PostAsJsonAsync(createEndpoint, request);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<CreateDatasetResponse>();
-            if (result == null)
-                throw new InvalidOperationException("Server returned an empty response when creating dataset");
-                
-            return result.Id;
-        }
-    }
-
-    private async Task ImportOutputFile(int datasetId, string outputFile, bool dryRun)
-    {
-        // Parse output file (always do this, even if dry-run is enabled).
-        Quantity quantity = await _parser.ParseOutputFileAsync(outputFile);
-
-        // Validate PFT mappings if this is individual-level data
-        if (quantity.Level == AggregationLevel.Individual && quantity.IndividualPfts != null)
-            ValidateIndivPftMappings(quantity, Path.GetFileName(outputFile));
-
-        if (dryRun)
-        {
-            _logger.LogInformation("[DRY RUN] File was parsed successfully, but will not be POST-ed");
-            return;
-        }
-
-        _logger.LogInformation("Importing {File}", Path.GetFileName(outputFile));
-
-        string endpoint = string.Format(addEndpoint, datasetId);
-
-        // Create the appropriate request type based on the quantity level
-        object request;
-        if (quantity.Level == AggregationLevel.Site)
-        {
-            request = new AddSiteRequest
-            {
-                Name = Path.GetFileNameWithoutExtension(outputFile),
-                InstructionFile = await File.ReadAllBytesAsync(outputFile),
-                Latitude = quantity.Latitude ?? throw new InvalidOperationException("Site-level quantity must have latitude"),
-                Longitude = quantity.Longitude ?? throw new InvalidOperationException("Site-level quantity must have longitude")
-            };
-        }
-        else
-        {
-            request = new AddGriddedRunRequest
-            {
-                InstructionFile = await File.ReadAllBytesAsync(outputFile),
-                GcmName = quantity.GcmName ?? throw new InvalidOperationException("Gridded quantity must have GCM name"),
-                EmissionsScenario = quantity.EmissionsScenario ?? throw new InvalidOperationException("Gridded quantity must have emissions scenario")
-            };
-        }
-
-        // Log the request size
-        string jsonContent = JsonSerializer.Serialize(request);
-        double sizeInMb = jsonContent.Length / (1024.0 * 1024.0);
-        _logger.LogDebug("Request size: {Size:F2} MiB", sizeInMb);
-        _logger.LogDebug("Layers: {Layers}", quantity.Layers.Select(l => $"{l.Name} ({l.Unit})").Aggregate((a, b) => $"{a}, {b}"));
-
-        var response = await _httpClient.PostAsJsonAsync(endpoint, request);
-        if (response.StatusCode != HttpStatusCode.OK)
-        {
-            string content = await response.Content.ReadAsStringAsync();
-            _logger.LogWarning("Server returned {Code}: {Content}", response.StatusCode, content);
-        }
-        response.EnsureSuccessStatusCode();
     }
 
     /// <summary>
@@ -296,11 +161,11 @@ public class ImportHandler
         indivMappings = null;
 
         // Get repository info
-        using var _ = _logger.BeginScope("importer");
-        GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(options.RepoPath);
+        using var _ = logger.BeginScope("importer");
+        RepositoryInfo repoInfo = git.GetRepositoryInfo(options.RepoPath);
 
         // Parse instruction file
-        string parameters = await _instructionParser.ParseInstructionFileAsync(options.InstructionFile);
+        string parameters = await insParser.ParseInstructionFileAsync(options.InstructionFile);
 
         // Get all output files and find most recent write time
         string[] outputFiles = Directory.GetFiles(options.OutputDir, "*.out");
@@ -309,17 +174,23 @@ public class ImportHandler
 
         DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
 
-        // Create dataset
-        int datasetId = await CreateDataset(
+        int datasetId = await apiClient.CreateDatasetAsync(
             options.Name,
             options.Description,
-            parameters,
+            repoInfo,
+            options.ClimateDataset,
+            options.TemporalResolution
+        );
+
+        // Create dataset
+        int gridId = await apiClient.CreateGriddedDatasetAsync(
+            options.Name,
+            options.Description,
+            datasetId,
             repoInfo,
             options.ClimateDataset,
             options.SpatialResolution,
-            options.TemporalResolution,
-            options.DryRun,
-            true);
+            options.TemporalResolution);
 
         // Process each output file, skipping stale ones
         foreach (string outputFile in outputFiles)
@@ -330,42 +201,67 @@ public class ImportHandler
                 continue;
             }
 
-            await ImportOutputFile(datasetId, outputFile, options.DryRun);
+            // Parse the output file.
+            Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
+
+            // Add it to the dataset.
+            await apiClient.AddQuantityAsync(gridId, quantity);
         }
     }
 
     public async Task HandleSiteImport(SiteOptions options)
     {
-        using var _ = _logger.BeginScope("importer");
+        using var _ = logger.BeginScope("importer");
 
         // Find all site-level runs
-        IEnumerable<(string, string, string)> runs = _gitService.FindSiteLevelRuns(options.RepoPath).ToList();
+        IEnumerable<(string, string, string)> runs = git.FindSiteLevelRuns(options.RepoPath).ToList();
         if (!runs.Any())
             throw new InvalidOperationException("No site-level runs found in repository");
 
         // Get repository info
-        GitService.RepositoryInfo repoInfo = _gitService.GetRepositoryInfo(options.RepoPath);
+        RepositoryInfo repoInfo = git.GetRepositoryInfo(options.RepoPath);
 
         // Get time stamp of most recently-written output file.
         IEnumerable<string> allFiles = runs.SelectMany(r => EnumerateOutputFiles(r.Item3));
         DateTime globalTimestamp = GetMostRecentWriteTime(allFiles.ToArray());
 
+        // Create dataset
+        int datasetId = await apiClient.CreateDatasetAsync(
+            options.Name,
+            options.Description,
+            repoInfo,
+            options.ClimateDataset,
+            options.TemporalResolution);
+
         foreach ((string siteName, string instructionFile, string outputDir) in runs)
         {
-            using var __ = _logger.BeginScope(siteName);
+            using var __ = logger.BeginScope(siteName);
 
             // Parse instruction file
-            string parameters = await _instructionParser.ParseInstructionFileAsync(instructionFile);
-            
+            string parameters = await insParser.ParseInstructionFileAsync(instructionFile);
+            string gridlist = insParser.GetGridlist();
+            IEnumerable<Coordinate> coordinates = await gridlistParser.Parse(gridlist);
+            if (coordinates.Count() > 1)
+                ExceptionHelper.Throw<InvalidDataException>(logger, $"Parser error: site {siteName} has more than one coordinate");
+
+            Coordinate coordinate = coordinates.Single();
+            logger.LogInformation("Creating site-level dataset");
+            int siteId = await apiClient.CreateSiteDatasetAsync(
+                datasetId,
+                siteName,
+                parameters,
+                coordinate.Latitude,
+                coordinate.Longitude);
+
             // Build the lookup table for this site's output files
-            _resolver.BuildLookupTable(_instructionParser);
+            resolver.BuildLookupTable(insParser);
 
             // Get all output files and find most recent write time
             string[] outputFiles = EnumerateOutputFiles(outputDir);
             if (!outputFiles.Any())
             {
                 // GetMostRecentWriteTime() will throw on empty collections.
-                _logger.LogWarning("Site {siteName} has no output files", siteName);
+                logger.LogWarning("Site {siteName} has no output files", siteName);
                 continue;
             }
 
@@ -374,27 +270,14 @@ public class ImportHandler
 
             if ((globalTimestamp - mostRecentWriteTime).TotalSeconds > staleSiteThresholdSeconds)
             {
-                _logger.LogWarning("Site {siteName} is stale (age: {age})", siteName, TimeUtils.FormatTimeSpan(globalTimestamp - mostRecentWriteTime));
+                logger.LogWarning("Site {siteName} is stale (age: {age})", siteName, TimeUtils.FormatTimeSpan(globalTimestamp - mostRecentWriteTime));
                 continue;
             }
-
-            // Create dataset
-            _logger.LogInformation("Creating dataset");
-            int datasetid = await CreateDataset(
-                options.Name,
-                options.Description,
-                parameters,
-                repoInfo,
-                options.ClimateDataset,
-                siteLevelSpatialResolution,
-                options.TemporalResolution,
-                options.DryRun,
-                false);
 
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
             {
-                using var ___ = _logger.BeginScope(Path.GetFileName(outputFile));
+                using var ___ = logger.BeginScope(Path.GetFileName(outputFile));
                 if (IsStaleFile(outputFile, mostRecentWriteTime))
                 {
                     EmitStaleFileWarning(outputFile, mostRecentWriteTime);
@@ -402,7 +285,12 @@ public class ImportHandler
                 }
 
                 string variableName = Path.GetFileNameWithoutExtension(outputFile);
-                await ImportOutputFile(datasetid, outputFile, options.DryRun);
+
+                // Parse the output file.
+                Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
+
+                // Add it to the dataset.
+                await apiClient.AddQuantityAsync(siteId, quantity);
             }
         }
     }

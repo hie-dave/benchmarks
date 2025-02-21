@@ -1,6 +1,8 @@
 using System.IO;
 using System.Threading.Tasks;
 using Dave.Benchmarks.Core.Services;
+using Microsoft.Extensions.Logging;
+using Moq;
 using Xunit;
 
 namespace Dave.Benchmarks.Tests.Services;
@@ -13,7 +15,8 @@ public class InstructionFileParserTests : IAsyncLifetime
     public InstructionFileParserTests()
     {
         _testDir = Path.Combine(Path.GetTempPath(), "instruction_tests");
-        _parser = new InstructionFileParser();
+        var logger = new Mock<ILogger<InstructionFileParser>>();
+        _parser = new InstructionFileParser(logger.Object);
     }
 
     public Task InitializeAsync()

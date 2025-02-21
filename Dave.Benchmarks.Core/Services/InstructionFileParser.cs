@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Dave.Benchmarks.Core.Models;
+using Dave.Benchmarks.Core.Utilities;
+using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.Core.Services;
 
@@ -16,6 +20,13 @@ public class InstructionFileParser
     private static readonly Regex ImportRegex = new(@"^import\s+""([^""]+)""", RegexOptions.Compiled);
     private static readonly Regex ParameterRegex = new(@"^(\S+)\s+""?([^""]+)""?", RegexOptions.Compiled);
     private readonly Dictionary<string, string> parameters = new();
+    private string fileName = string.Empty;
+    private readonly ILogger<InstructionFileParser> logger;
+
+    public InstructionFileParser(ILogger<InstructionFileParser> logger)
+    {
+        this.logger = logger;
+    }
 
     /// <summary>
     /// Parses an instruction file and returns its contents with all imports resolved.
@@ -26,6 +37,7 @@ public class InstructionFileParser
     {
         processedFiles.Clear();
         parameters.Clear();
+        fileName = filePath;
         return await ParseFileAsync(filePath);
     }
 
@@ -34,7 +46,7 @@ public class InstructionFileParser
     /// </summary>
     /// <param name="parameterName">Name of the parameter to retrieve.</param>
     /// <returns>The parameter value if found, null otherwise.</returns>
-    public bool TryGetParameterValue(string parameterName, out string? value)
+    public bool TryGetParameterValue(string parameterName, [MaybeNullWhen(false)] out string value)
     {
         return parameters.TryGetValue(parameterName, out value);
     }
@@ -105,5 +117,21 @@ public class InstructionFileParser
         }
 
         return sb.ToString();
+    }
+
+    public string GetGridlist()
+    {
+        if (string.IsNullOrEmpty(fileName))
+            throw new InvalidOperationException("Instruction file has not yet been parsed");
+
+        if (TryGetParameterValue(ModelConstants.ParamGridlist, out string? gridlist))
+            return gridlist;
+
+        if (TryGetParameterValue(ModelConstants.ParamGridlistCf, out gridlist))
+            return gridlist;
+
+        ExceptionHelper.Throw<InvalidDataException>(logger, $"Instruction file {fileName} does not contain a gridlist parameter");
+        throw new Exception(); // Can never happen
+        // TODO: replace with .net 10 return never
     }
 }

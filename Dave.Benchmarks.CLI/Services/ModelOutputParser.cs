@@ -7,6 +7,7 @@ using TemporalResolution = Dave.Benchmarks.Core.Models.Entities.TemporalResoluti
 using AggregationLevel = Dave.Benchmarks.Core.Models.Entities.AggregationLevel;
 
 using Dave.Benchmarks.Core.Utils;
+using Dave.Benchmarks.Core.Models;
 
 namespace Dave.Benchmarks.CLI.Services;
 
