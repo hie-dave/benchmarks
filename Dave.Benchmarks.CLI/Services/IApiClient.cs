@@ -3,6 +3,9 @@ using Dave.Benchmarks.Core.Services;
 
 namespace Dave.Benchmarks.CLI.Services;
 
+/// <summary>
+/// An interface to an API client.
+/// </summary>
 public interface IApiClient
 {
     /// <summary>

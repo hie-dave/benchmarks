@@ -3,12 +3,16 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Core.Utilities;
 using Microsoft.Extensions.Logging;
 
+namespace Dave.Benchmarks.CLI.Services;
+
+/// <summary>
+/// API client for interacting with the production API.
+/// </summary>
 public class ProductionApiClient : IApiClient
 {
     /// <summary>
