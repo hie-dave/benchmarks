@@ -119,7 +119,7 @@ public class InstructionFileParser
         return sb.ToString();
     }
 
-    public string GetGridlist()
+    private string GetGridlistRelative()
     {
         if (string.IsNullOrEmpty(fileName))
             throw new InvalidOperationException("Instruction file has not yet been parsed");
@@ -133,5 +133,22 @@ public class InstructionFileParser
         ExceptionHelper.Throw<InvalidDataException>(logger, $"Instruction file {fileName} does not contain a gridlist parameter");
         throw new Exception(); // Can never happen
         // TODO: replace with .net 10 return never
+    }
+
+    /// <summary>
+    /// Get the absolute path to a gridlist file.
+    /// </summary>
+    public string GetGridlist()
+    {
+        string relativePath = GetGridlistRelative();
+        string? directory = Path.GetDirectoryName(fileName);
+        if (directory == null)
+            // Directory will be null if path is root directory (cannot happen),
+            // or if the path doesn't contain a directory component, in which
+            // case, we can assume that it is in the current directory.
+            return relativePath;
+
+        string fullPath = Path.GetFullPath(Path.Combine(directory, relativePath));
+        return fullPath;
     }
 }

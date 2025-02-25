@@ -31,23 +31,23 @@ public class DryRunApiClient : IApiClient
     }
 
     /// <inheritdoc />
-    public Task<int> CreateDatasetAsync(string name, string description, RepositoryInfo repoInfo, string climateDataset, string temporalResolution)
+    public Task<int> CreateGroupAsync(string name, string description, string metadata)
+    {
+        logger.LogInformation("[DRY RUN] Would create group {Name} with description: {Description}", name, description);
+        return Task.FromResult(1);
+    }
+
+    /// <inheritdoc />
+    public Task<int> CreateDatasetAsync(string name, string description, RepositoryInfo repoInfo, string climateDataset, string temporalResolution, string metadata, int? groupId = null)
     {
         logger.LogInformation("[DRY RUN] Would create dataset {Name} ({ClimateDataset}, {TemporalResolution}) with description: {Description}", name, climateDataset, temporalResolution, description);
         return Task.FromResult(1);
     }
 
     /// <inheritdoc />
-    public Task<int> CreateSiteDatasetAsync(int datasetId, string site, string insFile, double latitude, double longitude)
+    public Task CompleteGroupAsync(int groupId)
     {
-        logger.LogInformation("[DRY RUN] Would create site {site} ({longitude}, {latitude}) in dataset {datasetId}", site, longitude, latitude, datasetId);
-        return Task.FromResult(1);
-    }
-
-    /// <inheritdoc />
-    public Task<int> CreateGriddedDatasetAsync(string name, string description, int datasetId, RepositoryInfo repoInfo, string climateDataset, string spatialResolution, string temporalResolution)
-    {
-        logger.LogInformation("[DRY RUN] Would create gridded dataset {Name} ({ClimateDataset}, {SpatialResolution}, {TemporalResolution}) in dataset {DatasetId}", name, climateDataset, spatialResolution, temporalResolution, datasetId);
-        return Task.FromResult(1);
+        logger.LogInformation("[DRY RUN] Would complete group {GroupId}", groupId);
+        return Task.CompletedTask;
     }
 }

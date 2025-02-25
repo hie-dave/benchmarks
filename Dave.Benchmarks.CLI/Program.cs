@@ -28,6 +28,7 @@ builder.Services.AddTransient<GitService>();
 builder.Services.AddTransient<InstructionFileParser>();
 builder.Services.AddTransient<CommandRunner>();
 builder.Services.AddTransient<ImportHandler>();
+builder.Services.AddTransient<GridlistParser>();
 builder.Services.AddSingleton<IOutputFileTypeResolver, OutputFileTypeResolver>();
 
 // Configure HTTP client and API client

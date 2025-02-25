@@ -3,6 +3,7 @@ using System;
 using Dave.Benchmarks.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dave.Benchmarks.Web.Migrations
 {
     [DbContext(typeof(BenchmarksDbContext))]
-    partial class BenchmarksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250225033905_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -312,8 +315,7 @@ namespace Dave.Benchmarks.Web.Migrations
                 {
                     b.HasOne("Dave.Benchmarks.Core.Models.Entities.DatasetGroup", "Group")
                         .WithMany("Datasets")
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("GroupId");
 
                     b.Navigation("Group");
                 });
@@ -348,7 +350,7 @@ namespace Dave.Benchmarks.Web.Migrations
                     b.HasOne("Dave.Benchmarks.Core.Models.Entities.Pft", "Pft")
                         .WithMany("Individuals")
                         .HasForeignKey("PftId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Dataset");

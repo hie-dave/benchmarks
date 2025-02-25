@@ -3,9 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace Dave.Benchmarks.Core.Models.Importer;
 
 /// <summary>
-/// Base request model for creating any type of dataset.
+/// Request model for creating a new prediction dataset.
 /// </summary>
-public abstract class CreateDatasetRequestBase
+public class CreateDatasetRequest
 {
     /// <summary>
     /// Name of the dataset.
@@ -43,4 +43,16 @@ public abstract class CreateDatasetRequestBase
     /// </summary>
     [Required]
     public byte[] CompressedCodePatches { get; set; } = Array.Empty<byte>();
+
+    /// <summary>
+    /// Additional metadata about this dataset.
+    /// For site-level datasets, this should include site location and characteristics.
+    /// For gridded datasets, this should include spatial extent and resolution.
+    /// </summary>
+    public string Metadata { get; set; } = "{}";
+
+    /// <summary>
+    /// Optional ID of the group to add this dataset to.
+    /// </summary>
+    public int? GroupId { get; set; }
 }

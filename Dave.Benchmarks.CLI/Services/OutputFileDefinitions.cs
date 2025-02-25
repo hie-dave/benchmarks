@@ -52,6 +52,8 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "file_dave_height_inc", "Height Growth", "Daily height growth", "m/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_height", "Plant Height", "Plant Height (m)", "m", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_diameter", "Stem Diameter", "Stem Diameter (m)", "m", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_basalarea", "Basal Area", "Basal Area (m2/tree)", "m2/tree", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_basalarea_inc", "Basal Area Increment", "Basal Area Increment (m2/tree/day)", "m2/tree", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_dturnover_leaf", "Leaf Turnover", "Daily leaf C turnover flux", "kgC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_dturnover_root", "Root Turnover", "Daily root C turnover flux", "kgC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_dturnover_sap", "Sap Turnover", "Daily sapwood C turnover flux", "kgC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
@@ -72,6 +74,7 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "file_dave_belowground_cmass", "Below-ground C Mass", "Daily below-ground C biomass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_aboveground_nmass", "Above-ground N Mass", "Daily above-ground N biomass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_belowground_nmass", "Below-ground N Mass", "Daily below-ground N biomass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_live_biomass", "Live Biomass", "Daily total live biomass (kg/m2)", "kg/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_indiv_npp", "Individual NPP", "Daily NPP", "gC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_sla", "Specific Leaf Area", "Daily specific leaf area", "m2/kgC", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_cmass_leaf", "Leaf C Mass", "Daily leaf carbon mass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);

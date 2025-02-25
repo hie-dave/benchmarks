@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Dave.Benchmarks.Core.Migrations
+namespace Dave.Benchmarks.Web.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -16,7 +16,7 @@ namespace Dave.Benchmarks.Core.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Datasets",
+                name: "DatasetGroups",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -26,28 +26,13 @@ namespace Dave.Benchmarks.Core.Migrations
                     Description = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    SpatialResolution = table.Column<string>(type: "longtext", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    TemporalResolution = table.Column<string>(type: "longtext", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    DatasetType = table.Column<string>(type: "varchar(13)", maxLength: 13, nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    Source = table.Column<string>(type: "longtext", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    Version = table.Column<string>(type: "longtext", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    InputDataSource = table.Column<string>(type: "longtext", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    Parameters = table.Column<byte[]>(type: "longblob", nullable: true),
-                    Patches = table.Column<byte[]>(type: "longblob", nullable: true),
-                    ClimateDataset = table.Column<string>(type: "longtext", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    ModelVersion = table.Column<string>(type: "longtext", nullable: true)
+                    IsComplete = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Metadata = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Datasets", x => x.Id);
+                    table.PrimaryKey("PK_DatasetGroups", x => x.Id);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -67,7 +52,7 @@ namespace Dave.Benchmarks.Core.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Variables",
+                name: "Datasets",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -76,20 +61,34 @@ namespace Dave.Benchmarks.Core.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Description = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Units = table.Column<string>(type: "longtext", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    SpatialResolution = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Level = table.Column<int>(type: "int", nullable: false),
-                    DatasetId = table.Column<int>(type: "int", nullable: false)
+                    TemporalResolution = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    GroupId = table.Column<int>(type: "int", nullable: true),
+                    DatasetType = table.Column<string>(type: "varchar(13)", maxLength: 13, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Source = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Version = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ModelVersion = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ClimateDataset = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Metadata = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Patches = table.Column<byte[]>(type: "longblob", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Variables", x => x.Id);
+                    table.PrimaryKey("PK_Datasets", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Variables_Datasets_DatasetId",
-                        column: x => x.DatasetId,
-                        principalTable: "Datasets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        name: "FK_Datasets_DatasetGroups_GroupId",
+                        column: x => x.GroupId,
+                        principalTable: "DatasetGroups",
+                        principalColumn: "Id");
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -116,6 +115,33 @@ namespace Dave.Benchmarks.Core.Migrations
                         name: "FK_Individuals_Pfts_PftId",
                         column: x => x.PftId,
                         principalTable: "Pfts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Variables",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    Name = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Description = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Units = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Level = table.Column<int>(type: "int", nullable: false),
+                    DatasetId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Variables", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Variables_Datasets_DatasetId",
+                        column: x => x.DatasetId,
+                        principalTable: "Datasets",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 })
@@ -258,6 +284,11 @@ namespace Dave.Benchmarks.Core.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Datasets_GroupId",
+                table: "Datasets",
+                column: "GroupId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Datum_LayerId",
                 table: "Datum",
                 column: "LayerId");
@@ -342,6 +373,9 @@ namespace Dave.Benchmarks.Core.Migrations
 
             migrationBuilder.DropTable(
                 name: "Datasets");
+
+            migrationBuilder.DropTable(
+                name: "DatasetGroups");
         }
     }
 }

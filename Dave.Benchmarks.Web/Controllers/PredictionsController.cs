@@ -21,11 +21,57 @@ public class PredictionsController : ControllerBase
         this.logger = logger;
     }
 
-    [HttpPost("site/create")]
-    public async Task<ActionResult<int>> CreateSiteDataset(
-        [FromBody] CreateSiteDatasetRequest request)
+    [HttpPost("groups/create")]
+    public async Task<ActionResult<int>> CreateDatasetGroup(
+        [FromBody] CreateDatasetGroupRequest request)
     {
-        SiteRunDataset dataset = new()
+        var group = new DatasetGroup
+        {
+            Name = request.Name,
+            Description = request.Description,
+            CreatedAt = DateTime.UtcNow,
+            Metadata = request.Metadata
+        };
+
+        _dbContext.DatasetGroups.Add(group);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(group.Id);
+    }
+
+    [HttpPost("groups/{groupId}/complete")]
+    public async Task<ActionResult> CompleteDatasetGroup(int groupId)
+    {
+        var group = await _dbContext.DatasetGroups
+            .FirstOrDefaultAsync(g => g.Id == groupId);
+
+        if (group == null)
+            return NotFound($"Group {groupId} not found");
+
+        group.IsComplete = true;
+        await _dbContext.SaveChangesAsync();
+
+        return Ok();
+    }
+
+    [HttpPost("create")]
+    public async Task<ActionResult<int>> CreateDataset(
+        [FromBody] CreateDatasetRequest request)
+    {
+        // If a group ID is provided, verify it exists and is not complete
+        if (request.GroupId.HasValue)
+        {
+            var group = await _dbContext.DatasetGroups
+                .FirstOrDefaultAsync(g => g.Id == request.GroupId.Value);
+
+            if (group == null)
+                return NotFound($"Group {request.GroupId.Value} not found");
+
+            if (group.IsComplete)
+                return BadRequest($"Group {request.GroupId.Value} is marked as complete and cannot accept new datasets");
+        }
+
+        var dataset = new PredictionDataset
         {
             Name = request.Name,
             Description = request.Description,
@@ -33,98 +79,15 @@ public class PredictionsController : ControllerBase
             ModelVersion = request.ModelVersion,
             ClimateDataset = request.ClimateDataset,
             TemporalResolution = request.TemporalResolution,
-            Patches = request.CompressedCodePatches
+            Patches = request.CompressedCodePatches,
+            Metadata = request.Metadata,
+            GroupId = request.GroupId
         };
 
         _dbContext.Datasets.Add(dataset);
         await _dbContext.SaveChangesAsync();
 
         return Ok(dataset.Id);
-    }
-
-    [HttpPost("gridded/create")]
-    public async Task<ActionResult<int>> CreateGriddedDataset(
-        [FromBody] CreateGriddedDatasetRequest request)
-    {
-        GriddedDataset dataset = new()
-        {
-            Name = request.Name,
-            Description = request.Description,
-            CreatedAt = DateTime.UtcNow,
-            ModelVersion = request.ModelVersion,
-            ClimateDataset = request.ClimateDataset,
-            TemporalResolution = request.TemporalResolution,
-            SpatialExtent = request.SpatialExtent,
-            SpatialResolution = request.SpatialResolution,
-            Patches = request.CompressedCodePatches
-        };
-
-        _dbContext.Datasets.Add(dataset);
-        await _dbContext.SaveChangesAsync();
-
-        return Ok(dataset.Id);
-    }
-
-    [HttpPost("site/{datasetId}/add")]
-    public async Task<ActionResult<int>> AddSite(
-        int datasetId,
-        [FromBody] AddSiteRequest request)
-    {
-        logger.LogInformation(
-            "Adding site {name} to dataset {DatasetId}",
-            request.Name,
-            datasetId);
-
-        Dataset? dataset = await _dbContext.Datasets
-            .FirstOrDefaultAsync(d => d.Id == datasetId);
-
-        if (dataset is not SiteRunDataset siteDataset)
-            return BadRequest("Dataset is not a site run dataset");
-
-        SiteRun site = new()
-        {
-            Name = request.Name,
-            Latitude = request.Latitude,
-            Longitude = request.Longitude,
-            DatasetId = datasetId,
-        };
-        site.SetCompressedInstructions(request.InstructionFile);
-
-        _dbContext.SiteRuns.Add(site);
-        await _dbContext.SaveChangesAsync();
-
-        return Ok(site.Id);
-    }
-
-    [HttpPost("gridded/{datasetId}/add")]
-    public async Task<ActionResult<int>> AddGriddedRun(
-        int datasetId,
-        [FromBody] AddGriddedRunRequest request)
-    {
-        logger.LogInformation(
-            "Adding scenario {gcm}/{scenario} to dataset {DatasetId}",
-            request.GcmName,
-            request.EmissionsScenario,
-            datasetId);
-
-        Dataset? dataset = await _dbContext.Datasets
-            .FirstOrDefaultAsync(d => d.Id == datasetId);
-
-        if (dataset is not GriddedDataset griddedDataset)
-            return BadRequest("Dataset is not a gridded dataset");
-
-        ClimateScenario scenario = new()
-        {
-            GcmName = request.GcmName,
-            EmissionsScenario = request.EmissionsScenario,
-            DatasetId = datasetId,
-        };
-        scenario.SetCompressedInstructions(request.InstructionFile);
-
-        _dbContext.ClimateScenarios.Add(scenario);
-        await _dbContext.SaveChangesAsync();
-
-        return Ok(scenario.Id);
     }
 
     [HttpPost("{datasetId}/add")]
@@ -179,172 +142,172 @@ public class PredictionsController : ControllerBase
             throw new InvalidOperationException("At least one layer is required");
 
         if (quantity.Layers.GroupBy(l => l.Unit).Count() > 1)
-            throw new InvalidOperationException("All layers must have the same units (TODO: we could support this in the future)");
+            throw new InvalidOperationException("All layers must have the same unit");
 
         if (variable == null)
         {
+            // Create new variable
             variable = new Variable
             {
                 Name = quantity.Name,
                 Description = quantity.Description,
                 Units = quantity.Layers.First().Unit.Name,
-                Level = quantity.Level,
-                Dataset = dataset
+                DatasetId = datasetId,
+                Level = quantity.Level
             };
 
-            _dbContext.Variables.Add(variable);
+            dataset.Variables.Add(variable);
+            await _dbContext.SaveChangesAsync();
+        }
+        else
+        {
+            // Validate variable matches
+            if (variable.Units != quantity.Layers.First().Unit.Name)
+                throw new InvalidOperationException(
+                    $"Variable {quantity.Name} already exists with unit " +
+                    $"{variable.Units}, but request has unit {quantity.Layers.First().Unit.Name}");
+
+            if (variable.Level != quantity.Level)
+                throw new InvalidOperationException(
+                    $"Variable {quantity.Name} already exists with level " +
+                    $"{variable.Level}, but request has level {quantity.Level}");
         }
 
-        // Add layers if they don't exist
-        foreach (Layer layerData in quantity.Layers)
+        // Create layers and their data points
+        foreach (var layer in quantity.Layers)
         {
-            VariableLayer? layer = variable.Layers
-                .FirstOrDefault(l => l.Name == layerData.Name);
-
-            if (layer == null)
+            var variableLayer = new VariableLayer
             {
-                layer = new VariableLayer
-                {
-                    Name = layerData.Name,
-                    // TODO: implement layer-level descriptions
-                    Description = layerData.Name,
-                    Variable = variable
-                };
-                _dbContext.VariableLayers.Add(layer);
-            }
+                Name = layer.Name,
+                Description = layer.Name, // TODO: add layer-level descriptions?
+                Variable = variable  // Use navigation property instead of ID
+            };
 
-            // Add data points based on variable level
+            _dbContext.VariableLayers.Add(variableLayer);
+            await _dbContext.SaveChangesAsync();
+
+            // Add data points for this layer
             switch (quantity.Level)
             {
                 case AggregationLevel.Gridcell:
-                    foreach (DataPoint point in layerData.Data)
+                    var gridcellData = layer.Data.Select(d => new GridcellDatum
                     {
-                        GridcellDatum datum = new()
-                        {
-                            Variable = variable,
-                            Layer = layer,
-                            Timestamp = point.Timestamp,
-                            Longitude = point.Longitude,
-                            Latitude = point.Latitude,
-                            Value = point.Value
-                        };
-                        _dbContext.GridcellData.Add(datum);
-                    }
+                        Timestamp = d.Timestamp,
+                        Value = d.Value,
+                        Latitude = d.Latitude,
+                        Longitude = d.Longitude,
+                        Variable = variable,
+                        Layer = variableLayer
+                    });
+                    _dbContext.GridcellData.AddRange(gridcellData);
                     break;
 
                 case AggregationLevel.Stand:
-                    foreach (DataPoint point in layerData.Data)
+                    var standData = layer.Data.Select(d => new StandDatum
                     {
-                        StandDatum datum = new()
-                        {
-                            Variable = variable,
-                            Layer = layer,
-                            Timestamp = point.Timestamp,
-                            Longitude = point.Longitude,
-                            Latitude = point.Latitude,
-                            StandId = point.Stand ?? throw new ArgumentException("Stand ID is required"),
-                            Value = point.Value
-                        };
-                        _dbContext.StandData.Add(datum);
-                    }
+                        Timestamp = d.Timestamp,
+                        Value = d.Value,
+                        Latitude = d.Latitude,
+                        Longitude = d.Longitude,
+                        StandId = d.Stand ?? throw new InvalidOperationException("Stand data must include stand ID"),
+                        Variable = variable,
+                        Layer = variableLayer
+                    });
+                    _dbContext.StandData.AddRange(standData);
                     break;
 
                 case AggregationLevel.Patch:
-                    foreach (DataPoint point in layerData.Data)
+                    var patchData = layer.Data.Select(d => new PatchDatum
                     {
-                        PatchDatum datum = new()
-                        {
-                            Variable = variable,
-                            Layer = layer,
-                            Timestamp = point.Timestamp,
-                            Longitude = point.Longitude,
-                            Latitude = point.Latitude,
-                            StandId = point.Stand ?? throw new ArgumentException("Stand ID is required"),
-                            PatchId = point.Patch ?? throw new ArgumentException("Patch ID is required"),
-                            Value = point.Value
-                        };
-                        _dbContext.PatchData.Add(datum);
-                    }
+                        Timestamp = d.Timestamp,
+                        Value = d.Value,
+                        Latitude = d.Latitude,
+                        Longitude = d.Longitude,
+                        StandId = d.Stand ?? throw new InvalidOperationException("Patch data must include stand ID"),
+                        PatchId = d.Patch ?? throw new InvalidOperationException("Patch data must include patch ID"),
+                        Variable = variable,
+                        Layer = variableLayer
+                    });
+                    _dbContext.PatchData.AddRange(patchData);
                     break;
 
                 case AggregationLevel.Individual:
-                    foreach (DataPoint point in layerData.Data)
+                    var individualData = layer.Data.Select(d => new IndividualDatum
                     {
-                        IndividualDatum datum = new()
-                        {
-                            Variable = variable,
-                            Layer = layer,
-                            Timestamp = point.Timestamp,
-                            Longitude = point.Longitude,
-                            Latitude = point.Latitude,
-                            StandId = point.Stand ?? throw new ArgumentException("Stand ID is required"),
-                            PatchId = point.Patch ?? throw new ArgumentException("Patch ID is required"),
-                            IndividualId = point.Individual ?? throw new ArgumentException("Individual ID is required"),
-                            Value = point.Value
-                        };
-                        _dbContext.IndividualData.Add(datum);
-                    }
+                        Timestamp = d.Timestamp,
+                        Value = d.Value,
+                        Latitude = d.Latitude,
+                        Longitude = d.Longitude,
+                        StandId = d.Stand ?? throw new InvalidOperationException("Individual data must include stand ID"),
+                        PatchId = d.Patch ?? throw new InvalidOperationException("Individual data must include patch ID"),
+                        Individual = _dbContext.Individuals.First(i => i.DatasetId == datasetId && i.Number == d.Individual!),
+                        Variable = variable,
+                        Layer = variableLayer
+                    });
+                    _dbContext.IndividualData.AddRange(individualData);
                     break;
 
                 default:
-                    throw new ArgumentException($"Unknown variable level: {variable.Level}");
+                    throw new InvalidOperationException($"Unknown aggregation level: {quantity.Level}");
             }
+
+            await _dbContext.SaveChangesAsync();
+            logger.LogInformation("Added {count} data points for layer {layer}", layer.Data.Count, layer.Name);
         }
 
-        await _dbContext.SaveChangesAsync();
-        logger.LogDebug("Successfully added quantity {name} to dataset {DatasetId}", quantity.Name, datasetId);
         return Ok();
     }
 
-    /// <summary>
-    /// Validates PFT mappings against existing database records and creates new PFTs and Individuals as needed.
-    /// </summary>
-    /// <param name="datasetId">The dataset ID.</param>
-    /// <param name="mappings">The individual-PFT mappings to validate and create.</param>
-    /// <exception cref="InvalidOperationException">Thrown if mappings are inconsistent with database.</exception>
-    private async Task ValidateAndCreateIndividuals(int datasetId, IReadOnlyDictionary<int, string> mappings)
+    private async Task ValidateAndCreateIndividuals(
+        int datasetId,
+        IReadOnlyDictionary<int, string> mappings)
     {
-        // Get existing individuals and their PFTs for this dataset
-        var existingMappings = await _dbContext.Individuals
+        // Get existing individuals for this dataset
+        var existingIndividuals = await _dbContext.Individuals
             .Where(i => i.DatasetId == datasetId)
-            .Select(i => new { i.Number, i.Pft.Name })
-            .ToDictionaryAsync(x => x.Number, x => x.Name);
+            .ToListAsync();
 
-        // Check for inconsistencies with existing mappings
-        foreach (var (indivNumber, pftName) in mappings)
+        // Get all PFTs
+        var pfts = await _dbContext.Pfts.ToListAsync();
+
+        foreach ((int indivId, string pftName) in mappings)
         {
-            if (existingMappings.TryGetValue(indivNumber, out string? existingPft) && existingPft != pftName)
+            // Check if individual already exists
+            var existing = existingIndividuals
+                .FirstOrDefault(i => i.Number == indivId);
+
+            if (existing != null)
             {
-                throw new InvalidOperationException(
-                    $"Inconsistent PFT mapping: Individual {indivNumber} is mapped to '{pftName}' " +
-                    $"but exists in database with PFT '{existingPft}'");
-            }
-        }
+                // Validate PFT matches
+                if (existing.Pft.Name != pftName)
+                {
+                    throw new InvalidOperationException(
+                        $"Individual {indivId} already exists with PFT " +
+                        $"'{existing.Pft.Name}', but request has PFT '{pftName}'");
+                }
 
-        // Get or create PFTs
-        Dictionary<string, Pft> pftMap = new();
-        foreach (string pftName in mappings.Values.Distinct())
-        {
-            Pft? pft = await _dbContext.Pfts.FirstOrDefaultAsync(p => p.Name == pftName);
+                continue;
+            }
+
+            // Get or create PFT
+            var pft = pfts.FirstOrDefault(p => p.Name == pftName);
             if (pft == null)
             {
                 pft = new Pft { Name = pftName };
                 _dbContext.Pfts.Add(pft);
+                pfts.Add(pft);
             }
-            pftMap[pftName] = pft;
-        }
 
-        // Create new individuals (only for those not already in database)
-        IEnumerable<Individual> newIndivs = mappings
-            .Where(kvp => !existingMappings.ContainsKey(kvp.Key))
-            .Select(kvp => new Individual
+            // Create individual
+            var individual = new Individual
             {
+                Number = indivId,
                 DatasetId = datasetId,
-                Number = kvp.Key,
-                Pft = pftMap[kvp.Value]
-            });
+                Pft = pft
+            };
 
-        _dbContext.Individuals.AddRange(newIndivs);
-        await _dbContext.SaveChangesAsync();
+            _dbContext.Individuals.Add(individual);
+            existingIndividuals.Add(individual);
+        }
     }
 }

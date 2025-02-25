@@ -174,23 +174,21 @@ public class ImportHandler
 
         DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
 
+        // Create group.
+        // TODO: group ID should be an optional user input.
+        int groupId = await apiClient.CreateGroupAsync(
+            options.Name,
+            options.Description); // TODO: metadata
+
+        // Create dataset
         int datasetId = await apiClient.CreateDatasetAsync(
             options.Name,
             options.Description,
             repoInfo,
             options.ClimateDataset,
-            options.TemporalResolution
-        );
-
-        // Create dataset
-        int gridId = await apiClient.CreateGriddedDatasetAsync(
-            options.Name,
-            options.Description,
-            datasetId,
-            repoInfo,
-            options.ClimateDataset,
-            options.SpatialResolution,
-            options.TemporalResolution);
+            options.TemporalResolution,
+            "{}", // TODO: metadata
+            groupId);
 
         // Process each output file, skipping stale ones
         foreach (string outputFile in outputFiles)
@@ -205,7 +203,7 @@ public class ImportHandler
             Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
 
             // Add it to the dataset.
-            await apiClient.AddQuantityAsync(gridId, quantity);
+            await apiClient.AddQuantityAsync(datasetId, quantity);
         }
     }
 
@@ -225,13 +223,10 @@ public class ImportHandler
         IEnumerable<string> allFiles = runs.SelectMany(r => EnumerateOutputFiles(r.Item3));
         DateTime globalTimestamp = GetMostRecentWriteTime(allFiles.ToArray());
 
-        // Create dataset
-        int datasetId = await apiClient.CreateDatasetAsync(
+        // Create group.
+        int groupId = await apiClient.CreateGroupAsync(
             options.Name,
-            options.Description,
-            repoInfo,
-            options.ClimateDataset,
-            options.TemporalResolution);
+            options.Description); // TODO: metadata
 
         foreach ((string siteName, string instructionFile, string outputDir) in runs)
         {
@@ -243,15 +238,6 @@ public class ImportHandler
             IEnumerable<Coordinate> coordinates = await gridlistParser.Parse(gridlist);
             if (coordinates.Count() > 1)
                 ExceptionHelper.Throw<InvalidDataException>(logger, $"Parser error: site {siteName} has more than one coordinate");
-
-            Coordinate coordinate = coordinates.Single();
-            logger.LogInformation("Creating site-level dataset");
-            int siteId = await apiClient.CreateSiteDatasetAsync(
-                datasetId,
-                siteName,
-                parameters,
-                coordinate.Latitude,
-                coordinate.Longitude);
 
             // Build the lookup table for this site's output files
             resolver.BuildLookupTable(insParser);
@@ -274,6 +260,17 @@ public class ImportHandler
                 continue;
             }
 
+            Coordinate coordinate = coordinates.Single();
+            logger.LogInformation("Creating site-level dataset");
+            int datasetId = await apiClient.CreateDatasetAsync(
+                siteName,
+                $"{options.Name} - {siteName}",
+                repoInfo,
+                options.ClimateDataset,
+                options.TemporalResolution,
+                "{}", // TODO: metadata
+                groupId);
+
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
             {
@@ -290,7 +287,7 @@ public class ImportHandler
                 Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
 
                 // Add it to the dataset.
-                await apiClient.AddQuantityAsync(siteId, quantity);
+                await apiClient.AddQuantityAsync(datasetId, quantity);
             }
         }
     }

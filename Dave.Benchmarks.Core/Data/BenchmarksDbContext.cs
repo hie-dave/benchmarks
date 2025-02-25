@@ -22,8 +22,7 @@ public class BenchmarksDbContext : DbContext
     public DbSet<Pft> Pfts { get; set; } = null!;
     public DbSet<Individual> Individuals { get; set; } = null!;
     public DbSet<IndividualDatum> IndividualData { get; set; } = null!;
-    public DbSet<SiteRun> SiteRuns { get; set; } = null!;
-    public DbSet<ClimateScenario> ClimateScenarios { get; set; } = null!;
+    public DbSet<DatasetGroup> DatasetGroups { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,43 +36,60 @@ public class BenchmarksDbContext : DbContext
         modelBuilder.Entity<Dataset>()
             .HasDiscriminator<string>("DatasetType")
             .HasValue<ObservationDataset>("Observation")
-            .HasValue<SiteRunDataset>("SiteRun")
-            .HasValue<GriddedDataset>("Gridded")
-            .IsComplete(true);  // Ensures only these three types are allowed
+            .HasValue<PredictionDataset>("Prediction")
+            .IsComplete(true);  // Ensures only these two types are allowed
 
-        // Configure relationships
+        // Configure relationships with cascade delete
+        modelBuilder.Entity<Dataset>()
+            .HasOne(d => d.Group)
+            .WithMany(g => g.Datasets)
+            .HasForeignKey(d => d.GroupId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<Variable>()
             .HasOne(v => v.Dataset)
             .WithMany(d => d.Variables)
-            .HasForeignKey(v => v.DatasetId);
-
-        modelBuilder.Entity<Variable>()
-            .HasMany(v => v.Layers)
-            .WithOne(l => l.Variable)
-            .HasForeignKey(l => l.VariableId);
+            .HasForeignKey(v => v.DatasetId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<VariableLayer>()
             .HasOne(l => l.Variable)
             .WithMany(v => v.Layers)
-            .HasForeignKey(l => l.VariableId);
-
-        // Configure relationships for site runs
-        modelBuilder.Entity<SiteRun>()
-            .HasOne(s => s.Dataset)
-            .WithMany(d => d.Sites)
-            .HasForeignKey(s => s.DatasetId)
+            .HasForeignKey(l => l.VariableId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Configure relationships for climate scenarios
-        modelBuilder.Entity<ClimateScenario>()
-            .HasOne(c => c.Dataset)
-            .WithMany(d => d.ClimateScenarios)
-            .HasForeignKey(c => c.DatasetId)
+        // Configure data point relationships with cascade delete
+        modelBuilder.Entity<Datum>()
+            .HasOne(d => d.Variable)
+            .WithMany()
+            .HasForeignKey(d => d.VariableId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Configure instruction file storage
-        modelBuilder.Entity<Simulation>()
-            .Property<byte[]>("InstructionFile");
+        modelBuilder.Entity<Datum>()
+            .HasOne(d => d.Layer)
+            .WithMany()
+            .HasForeignKey(d => d.LayerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Configure Individual-level data with cascade delete
+        modelBuilder.Entity<Individual>()
+            .HasOne(i => i.Dataset)
+            .WithMany()
+            .HasForeignKey(i => i.DatasetId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Pft>()
+            .HasMany(p => p.Individuals)
+            .WithOne(i => i.Pft)
+            .HasForeignKey(i => i.PftId)
+            .OnDelete(DeleteBehavior.Restrict); // Don't cascade delete PFTs
+
+        modelBuilder.Entity<IndividualDatum>()
+            .HasOne(d => d.Individual)
+            .WithMany(i => i.Data)
+            .HasForeignKey(d => d.IndividualId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Add indexes for common query patterns
         modelBuilder.Entity<GridcellDatum>()
@@ -107,25 +123,10 @@ public class BenchmarksDbContext : DbContext
             .IsUnique();
 
         modelBuilder.Entity<Individual>()
-            .HasOne(i => i.Pft)
-            .WithMany(p => p.Individuals)
-            .HasForeignKey(i => i.PftId);
-
-        modelBuilder.Entity<Individual>()
-            .HasOne(i => i.Dataset)
-            .WithMany()
-            .HasForeignKey(i => i.DatasetId);
-
-        // Ensure individual numbers are unique within a dataset
-        modelBuilder.Entity<Individual>()
             .HasIndex(i => new { i.DatasetId, i.Number })
             .IsUnique();
 
-        modelBuilder.Entity<IndividualDatum>()
-            .HasOne(d => d.Individual)
-            .WithMany(i => i.Data)
-            .HasForeignKey(d => d.IndividualId);
-
+        // Add indexes for individual data
         modelBuilder.Entity<IndividualDatum>()
             .HasIndex(d => d.VariableId);
         modelBuilder.Entity<IndividualDatum>()

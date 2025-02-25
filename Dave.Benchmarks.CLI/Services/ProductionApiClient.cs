@@ -1,4 +1,3 @@
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -21,19 +20,19 @@ public class ProductionApiClient : IApiClient
     private const string predictionsApi = "api/predictions";
 
     /// <summary>
+    /// API endpoint used to create a dataset group.
+    /// </summary>
+    private const string createGroupEndpoint = "groups/create";
+
+    /// <summary>
     /// API endpoint used to upload data to a quantity.
     /// </summary>
     private const string addQuantityEndpoint = "{0}/add";
 
     /// <summary>
-    /// API endpoint used to add a site run to a dataset.
+    /// API endpoint used to flag a group as complete.
     /// </summary>
-    private const string addSiteEndpoint = "site/{0}/add";
-
-    /// <summary>
-    /// API endpoint used to add a gridded run to a dataset.
-    /// </summary>
-    private const string addGriddedEndpoint = "gridded/{0}/add";
+    private const string completeGroupEndpoint = "groups/{0}/complete";
 
     /// <summary>
     /// API endpoint used to create a dataset.
@@ -68,61 +67,51 @@ public class ProductionApiClient : IApiClient
         await PostAsync(endpoint, quantity);
     }
 
+    /// <summary>
+    /// Flag a group as complete.
+    /// </summary>
+    /// <param name="groupId">ID of the group.</param>
+    public async Task CompleteGroupAsync(int groupId)
+    {
+        string endpoint = string.Format(completeGroupEndpoint, groupId);
+        await PostAsync(endpoint);
+    }
+
+    /// <summary>
+    /// Create a dataset group.
+    /// </summary>
+    /// <param name="name">Name of the group.</param>
+    /// <param name="description">Description of the group.</param>
+    /// <param name="metadata">Metadata for the group, encoded as JSON.</param>
+    /// <returns>The ID of the created group.</returns>
+    public async Task<int> CreateGroupAsync(
+        string name,
+        string description,
+        string metadata)
+    {
+        CreateDatasetGroupRequest request = new CreateDatasetGroupRequest()
+        {
+            Name = name,
+            Description = description,
+            Metadata = metadata
+        };
+
+        string endpoint = createGroupEndpoint;
+        var response = await PostAsync(endpoint, request);
+        return await response.Content.ReadFromJsonAsync<int>();
+    }
+
     /// <inheritdoc />
     public async Task<int> CreateDatasetAsync(
         string name,
         string description,
         RepositoryInfo repoInfo,
         string climateDataset,
-        string temporalResolution)
+        string temporalResolution,
+        string metadata,
+        int? groupId = null)
     {
-        CreateSiteDatasetRequest request = new CreateSiteDatasetRequest()
-        {
-            Name = name,
-            Description = description,
-            ModelVersion = repoInfo.CommitHash,
-            ClimateDataset = climateDataset,
-            TemporalResolution = temporalResolution,
-            CompressedCodePatches = repoInfo.Patches
-        };
-
-        var response = await PostAsync(createEndpoint, request);
-        return await response.Content.ReadFromJsonAsync<int>();
-    }
-
-    /// <inheritdoc />
-    public async Task<int> CreateSiteDatasetAsync(
-        int datasetId,
-        string site,
-        string insFile,
-        double latitude,
-        double longitude)
-    {
-        AddSiteRequest request = new AddSiteRequest()
-        {
-            Name = site,
-            InstructionFile = CompressionUtility.CompressText(insFile),
-            Latitude = latitude,
-            Longitude = longitude
-        };
-
-        string endpoint = string.Format(addSiteEndpoint, datasetId);
-        var response = await PostAsync(endpoint, request);
-
-        return await response.Content.ReadFromJsonAsync<int>();
-    }
-
-    /// <inheritdoc />
-    public async Task<int> CreateGriddedDatasetAsync(
-        string name,
-        string description,
-        int datasetId,
-        RepositoryInfo repoInfo,
-        string climateDataset,
-        string spatialResolution,
-        string temporalResolution)
-    {
-        CreateGriddedDatasetRequest request = new CreateGriddedDatasetRequest()
+        CreateDatasetRequest request = new CreateDatasetRequest()
         {
             Name = name,
             Description = description,
@@ -130,19 +119,33 @@ public class ProductionApiClient : IApiClient
             ClimateDataset = climateDataset,
             TemporalResolution = temporalResolution,
             CompressedCodePatches = repoInfo.Patches,
-            SpatialResolution = spatialResolution
+            Metadata = metadata,
+            GroupId = groupId
         };
 
-        string endpoint = string.Format(addGriddedEndpoint, datasetId);
-        var response = await PostAsync(endpoint, request);
+        var response = await PostAsync(createEndpoint, request);
         return await response.Content.ReadFromJsonAsync<int>();
+    }
+
+    /// <summary>
+    /// Performs a POST request to the specified endpoint with no body.
+    /// </summary>
+    /// <param name="endpoint">The API endpoint, relative to the predictions API base URL.</param>
+    private async Task<HttpResponseMessage> PostAsync(string endpoint)
+    {
+        endpoint = $"{predictionsApi}/{endpoint}";
+        logger.LogDebug("Sending POST request to {endpoint}", endpoint);
+
+        var response = await httpClient.PostAsync(endpoint, null);
+        await ValidateResponseAsync(response);
+        return response;
     }
 
     /// <summary>
     /// Performs a POST request to the specified endpoint.
     /// </summary>
     /// <param name="endpoint">The API endpoint, relative to the predictions API base URL.</param>
-    /// <param name="request">The obejct to be POSTed.</param>
+    /// <param name="request">The object to be POSTed.</param>
     private async Task<HttpResponseMessage> PostAsync(string endpoint, object request)
     {
         endpoint = $"{predictionsApi}/{endpoint}";

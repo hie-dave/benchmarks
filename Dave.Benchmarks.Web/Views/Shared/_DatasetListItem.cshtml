@@ -1,0 +1,47 @@
+@using Dave.Benchmarks.Core.Models.Entities
+@model Dataset
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+        <h6 class="mb-0">@Model.Name</h6>
+        <small class="text-muted">
+            @(Model is PredictionDataset ? "Prediction" : "Observation")
+        </small>
+    </div>
+    <button class="btn btn-danger btn-sm delete-dataset" 
+            data-dataset-id="@Model.Id" 
+            data-dataset-name="@Model.Name">
+        <i class="bi bi-trash"></i>
+    </button>
+</div>
+
+<div class="mb-2">
+    <small class="text-muted">Created: @Model.CreatedAt.ToString("g")</small><br/>
+    @if (!string.IsNullOrEmpty(Model.Description))
+    {
+        <small>@Model.Description</small>
+    }
+    
+    @if (Model is PredictionDataset pred)
+    {
+        <div class="mt-1">
+            <small class="text-muted">Model Version: @pred.ModelVersion</small><br/>
+            <small class="text-muted">Climate Data: @pred.ClimateDataset</small>
+        </div>
+    }
+    else if (Model is ObservationDataset obs)
+    {
+        <div class="mt-1">
+            <small class="text-muted">Source: @obs.Source</small><br/>
+            <small class="text-muted">Version: @obs.Version</small>
+        </div>
+    }
+</div>
+
+<select class="form-select variable-select" data-dataset-id="@Model.Id">
+    <option value="">All Variables</option>
+    @foreach (var variable in Model.Variables)
+    {
+        <option value="@variable.Id">@variable.Name</option>
+    }
+</select>

@@ -17,4 +17,10 @@ public abstract class Dataset
 
     // Navigation properties
     public ICollection<Variable> Variables { get; set; } = new List<Variable>();
+
+    /// <summary>
+    /// The group this dataset belongs to, if any.
+    /// </summary>
+    public DatasetGroup? Group { get; set; }
+    public int? GroupId { get; set; }
 }
