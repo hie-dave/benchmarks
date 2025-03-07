@@ -12,72 +12,65 @@
         <div class="col-md-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">Datasets</h5>
+                    <h5 class="card-title mb-0">Select Data</h5>
                 </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush dataset-tree">
-                        @{
-                            var ungroupedDatasets = Model.FirstOrDefault(g => g.Key == null);
-                            if (ungroupedDatasets != null && ungroupedDatasets.Any())
-                            {
-                                foreach (var dataset in ungroupedDatasets)
+                <div class="card-body">
+                    <!-- Dataset Group/Ungrouped Dataset Selection -->
+                    <div class="mb-3">
+                        <label for="datasetGroupSelect" class="form-label">Dataset Group or Dataset</label>
+                        <select class="form-select" id="datasetGroupSelect">
+                            <option value="">Select...</option>
+                            <!-- Ungrouped Datasets -->
+                            @{
+                                var ungroupedDatasets = Model.FirstOrDefault(g => g.Key == null);
+                                if (ungroupedDatasets != null && ungroupedDatasets.Any())
                                 {
-                                    <div class="list-group-item dataset-item" data-dataset-id="@dataset.Id">
-                                        <div class="form-check">
-                                            <input class="form-check-input dataset-selector" type="radio" name="dataset" id="dataset-@dataset.Id" value="@dataset.Id">
-                                            <label class="form-check-label" for="dataset-@dataset.Id">
-                                                @dataset.Name
-                                                <small class="text-muted d-block">@(dataset is PredictionDataset ? "Prediction" : "Observation")</small>
-                                            </label>
-                                        </div>
-                                    </div>
+                                    <optgroup label="Ungrouped Datasets">
+                                        @foreach (var dataset in ungroupedDatasets)
+                                        {
+                                            <option value="dataset-@dataset.Id" data-type="dataset" data-id="@dataset.Id">
+                                                @dataset.Name (@dataset.Variables.Count) variables
+                                            </option>
+                                        }
+                                    </optgroup>
                                 }
                             }
-
-                            foreach (var group in Model.Where(g => g.Key != null))
+                            <!-- Dataset Groups -->
+                            @if (Model.Any(g => g.Key != null))
                             {
-                                <div class="list-group-item dataset-group">
-                                    <div class="d-flex align-items-center group-header mb-2">
-                                        <i class="bi bi-folder me-2"></i>
-                                        <span>@group.Key!.Name</span>
-                                        <span class="badge bg-secondary ms-2">@group.Count()</span>
-                                    </div>
-                                    <div class="dataset-group-items ps-4">
-                                        @foreach (var dataset in group)
-                                        {
-                                            <div class="dataset-item mb-2" data-dataset-id="@dataset.Id">
-                                                <div class="form-check">
-                                                    <input class="form-check-input dataset-selector" type="radio" name="dataset" id="dataset-@dataset.Id" value="@dataset.Id">
-                                                    <label class="form-check-label" for="dataset-@dataset.Id">
-                                                        @dataset.Name
-                                                        <small class="text-muted d-block">@(dataset is PredictionDataset ? "Prediction" : "Observation")</small>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
+                                <optgroup label="Dataset Groups">
+                                    @foreach (var group in Model.Where(g => g.Key != null))
+                                    {
+                                        <option value="group-@group.Key!.Id" data-type="group" data-id="@group.Key!.Id">
+                                            @group.Key!.Name (@group.Count() datasets, @group.Sum(d => d.Variables.Count) variables)
+                                        </option>
+                                    }
+                                </optgroup>
                             }
-                        }
+                        </select>
                     </div>
-                </div>
-                <div id="selectedDatasetDetails" class="d-none">
-                    <hr class="my-0">
-                    <div class="p-3">
-                        <div class="selected-dataset-info mb-3">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                        <div class="form-group">
-                            <label for="variableSelect" class="form-label">Select Variable</label>
-                            <select class="form-select" id="variableSelect" disabled>
-                                <option value="">Select a variable...</option>
-                            </select>
-                        </div>
-                        <div class="mt-3 text-end">
-                            <button class="btn btn-danger btn-sm delete-dataset" style="display: none;">
-                                <i class="bi bi-trash"></i> Delete Dataset
-                            </button>
-                        </div>
+
+                    <!-- Dataset Selection (only shown for groups) -->
+                    <div class="mb-3" id="datasetSelectContainer" style="display: none;">
+                        <label for="datasetSelect" class="form-label">Dataset</label>
+                        <select class="form-select" id="datasetSelect" disabled>
+                            <option value="">Select dataset...</option>
+                        </select>
+                    </div>
+
+                    <!-- Variable Selection -->
+                    <div class="mb-3">
+                        <label for="variableSelect" class="form-label">Variable</label>
+                        <select class="form-select" id="variableSelect" disabled>
+                            <option value="">Select variable...</option>
+                        </select>
+                    </div>
+
+                    <!-- Delete Button -->
+                    <div class="mt-3">
+                        <button class="btn btn-danger w-100" id="deleteDatasetBtn" style="display: none;">
+                            <i class="bi bi-trash"></i> Delete Dataset
+                        </button>
                     </div>
                 </div>
             </div>
@@ -85,21 +78,16 @@
 
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Data</h5>
+                    <div id="datasetInfo" class="text-muted small"></div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="dataTable" class="table table-striped">
+                        <table id="dataTable" class="table table-striped table-hover">
                             <thead>
-                                <tr>
-                                    <th>Loading...</th>
-                                </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td>Select a dataset and variable to view data</td>
-                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -118,11 +106,11 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                Are you sure you want to delete "<span id="deleteDatasetName"></span>"?
+                Are you sure you want to delete this dataset? This action cannot be undone.
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">Delete</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
             </div>
         </div>
     </div>
@@ -134,248 +122,145 @@
     <script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
-    <style>
-        .dataset-tree .dataset-group {
-            background-color: #f8f9fa;
-        }
-        .dataset-tree .dataset-group-items {
-            border-left: 2px solid #dee2e6;
-        }
-        .dataset-item:hover {
-            background-color: #f8f9fa;
-        }
-        .dataset-group .group-header {
-            cursor: pointer;
-        }
-        #selectedDatasetDetails {
-            background-color: #f8f9fa;
-        }
-        .selected-dataset-info {
-            font-size: 0.9rem;
-        }
-        #dataTable.processing tbody {
-            opacity: 0.5;
-        }
-        #dataTable.processing tbody td {
-            color: #6c757d;
-        }
-    </style>
-
     <script>
         $(document).ready(function() {
             let dataTable = null;
+            let currentDatasetId = null;
 
             function initializeDataTable(data) {
-                console.log('Initializing DataTable with data:', {
-                    isArray: Array.isArray(data),
-                    length: data?.length,
-                    firstItem: data?.[0],
-                    allData: data
-                });
-                
                 if (dataTable) {
-                    console.log('Destroying existing DataTable');
                     dataTable.destroy();
                 }
 
-                if (!data || !data.length) {
-                    console.log('No data provided, showing empty table');
-                    dataTable = $('#dataTable').DataTable({
-                        columns: [{ title: "Message", data: null }],
-                        data: [{ Message: "No data available for this variable" }],
-                        language: {
-                            emptyTable: "No data available for this variable"
-                        }
-                    });
-                    return;
-                }
-
-                // Get columns from the first data item
-                const columns = Object.keys(data[0]).map(key => ({
-                    title: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize first letter
-                    data: key,
-                    render: function(data) {
-                        if (data === null || data === undefined) return '';
-                        
-                        // Handle different data types appropriately
-                        if (data instanceof Date || (typeof data === 'string' && !isNaN(Date.parse(data)))) {
-                            return new Date(data).toLocaleString();
-                        }
-                        if (typeof data === 'number') {
-                            return data.toLocaleString(undefined, { 
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 4 
-                            });
-                        }
-                        return data.toString();
-                    }
+                const columns = Object.keys(data[0] || {}).map(key => ({
+                    title: key,
+                    data: key
                 }));
 
-                console.log('Detected columns:', columns);
-
-                // Initialize DataTable with the data
                 dataTable = $('#dataTable').DataTable({
                     data: data,
                     columns: columns,
-                    order: [[0, 'asc']],
                     pageLength: 25,
-                    processing: true,
-                    language: {
-                        processing: "Loading data...",
-                        emptyTable: "No data available for this variable"
-                    }
+                    order: [],
+                    scrollX: true
                 });
-
-                console.log('DataTable initialized with', data.length, 'rows');
             }
 
-            // Initialize with empty state
-            initializeDataTable([]);
+            function updateDatasetInfo(dataset) {
+                let info = [];
+                if (dataset.spatialResolution) info.push(`Spatial: ${dataset.spatialResolution}`);
+                if (dataset.temporalResolution) info.push(`Temporal: ${dataset.temporalResolution}`);
+                $('#datasetInfo').text(info.join(' | '));
+            }
 
-            // Handle dataset selection
-            $('.dataset-selector').on('change', function() {
+            function resetSelectors() {
+                $('#datasetSelect').prop('disabled', true).val('');
+                $('#variableSelect').prop('disabled', true).val('');
+                $('#deleteDatasetBtn').hide();
+                $('#datasetSelectContainer').hide();
+                if (dataTable) dataTable.clear().draw();
+            }
+
+            function loadVariablesForDataset(datasetId) {
+                $.get(`/api/data/dataset/${datasetId}/variables`, function(variables) {
+                    const select = $('#variableSelect');
+                    select.empty().append('<option value="">Select variable...</option>');
+                    
+                    variables.forEach(variable => {
+                        select.append(`<option value="${variable.id}">${variable.name} (${variable.units})</option>`);
+                    });
+                    
+                    select.prop('disabled', false);
+                });
+
+                // Show delete button and update info
+                $('#deleteDatasetBtn').show();
+                $.get(`/api/data/dataset/${datasetId}`, function(dataset) {
+                    updateDatasetInfo(dataset);
+                });
+            }
+
+            // Handle group/dataset selection
+            $('#datasetGroupSelect').on('change', function() {
+                const selected = $(this).find(':selected');
+                const type = selected.data('type');
+                const id = selected.data('id');
+
+                // Reset all dependent controls
+                resetSelectors();
+
+                if (!type || !id) return;
+
+                if (type === 'group') {
+                    // Load datasets for the selected group
+                    $.get(`/api/data/group/${id}`, function(group) {
+                        const select = $('#datasetSelect');
+                        select.empty().append('<option value="">Select dataset...</option>');
+                        
+                        group.datasets.forEach(dataset => {
+                            select.append(`<option value="${dataset.id}">${dataset.name} (${dataset.variables.length} variables)</option>`);
+                        });
+                        
+                        select.prop('disabled', false);
+                        $('#datasetSelectContainer').show();
+                    });
+                } else {
+                    // Direct dataset selection
+                    currentDatasetId = id;
+                    loadVariablesForDataset(id);
+                }
+            });
+
+            // Handle dataset selection from group
+            $('#datasetSelect').on('change', function() {
                 const datasetId = $(this).val();
-                console.log('Dataset selected:', datasetId);
+                currentDatasetId = datasetId;
+                
+                // Reset variable selector and table
+                $('#variableSelect').prop('disabled', true).val('');
+                if (dataTable) dataTable.clear().draw();
                 
                 if (!datasetId) {
-                    console.log('No dataset ID');
+                    $('#deleteDatasetBtn').hide();
                     return;
                 }
 
-                const apiUrl = `/api/data/datasets/${datasetId}`;
-                console.log('Fetching dataset details from:', apiUrl);
-
-                // Load dataset details and variables
-                $.get(apiUrl)
-                    .done(function(dataset) {
-                        console.log('Dataset loaded:', dataset);
-                        
-                        // Update dataset details
-                        let detailsHtml = `
-                            <div class="fw-bold">${dataset.name}</div>
-                            <div class="text-muted small">${dataset.type === 'Prediction' ? 'Prediction Dataset' : 'Observation Dataset'}</div>
-                            <div class="small mt-1">${dataset.description || ''}</div>
-                            <div class="text-muted small mt-1">Created: ${new Date(dataset.createdAt).toLocaleString()}</div>
-                        `;
-                        $('.selected-dataset-info').html(detailsHtml);
-                        
-                        // Show the details section
-                        $('#selectedDatasetDetails').removeClass('d-none');
-
-                        // Update delete button
-                        $('.delete-dataset')
-                            .show()
-                            .data('dataset-id', dataset.id)
-                            .data('dataset-name', dataset.name);
-
-                        // Update variable select
-                        let variableSelect = $('#variableSelect');
-                        variableSelect.empty().append('<option value="">Select a variable...</option>');
-                        
-                        if (dataset.variables && dataset.variables.length > 0) {
-                            console.log('Loading variables:', dataset.variables);
-                            dataset.variables.forEach(variable => {
-                                variableSelect.append(`<option value="${variable.id}">${variable.name}</option>`);
-                            });
-                            variableSelect.prop('disabled', false);
-                        } else {
-                            console.log('No variables found in dataset');
-                            variableSelect.prop('disabled', true);
-                        }
-
-                        // Reset table to empty state
-                        initializeDataTable([]);
-                    })
-                    .fail(function(jqXHR, textStatus, errorThrown) {
-                        console.error('Failed to load dataset:', textStatus, errorThrown);
-                        alert('Failed to load dataset details. Please try again.');
-                    });
+                loadVariablesForDataset(datasetId);
             });
 
             // Handle variable selection
             $('#variableSelect').on('change', function() {
                 const variableId = $(this).val();
-                console.log('Variable selected:', variableId);
-                
                 if (!variableId) {
-                    console.log('No variable ID');
-                    initializeDataTable([]); // Reset table to empty state
+                    if (dataTable) dataTable.clear().draw();
                     return;
                 }
 
-                const datasetId = $('.dataset-selector:checked').val();
-                console.log('Current dataset:', datasetId);
-                
-                const apiUrl = `/api/data/datasets/${datasetId}/variables/${variableId}/data`;
-                console.log('Fetching variable data from:', apiUrl);
-
-                // Show loading state in the table
-                $('#dataTable').addClass('processing');
-                if (dataTable) {
-                    $('#dataTable').find('tbody').html('<tr><td colspan="100%" class="text-center">Loading data...</td></tr>');
-                }
-
-                // Load variable data
-                $.get(apiUrl)
-                    .done(function(data) {
-                        console.log('Variable data loaded:', {
-                            dataType: typeof data,
-                            isArray: Array.isArray(data),
-                            length: data?.length,
-                            firstItem: data?.[0],
-                            allData: data
-                        });
-                        
-                        // Ensure data is an array
-                        if (!Array.isArray(data)) {
-                            console.error('Data is not an array:', data);
-                            alert('Received invalid data format from server');
-                            return;
-                        }
-                        
-                        initializeDataTable(data);
-                    })
-                    .fail(function(jqXHR, textStatus, errorThrown) {
-                        console.error('Failed to load variable data:', textStatus, errorThrown);
-                        alert('Failed to load variable data. Please try again.');
-                        initializeDataTable([]); // Reset table to empty state
-                    })
-                    .always(function() {
-                        $('#dataTable').removeClass('processing');
-                    });
-            });
-
-            // Handle group expansion
-            $('.group-header').on('click', function() {
-                $(this).closest('.dataset-group').find('.dataset-group-items').slideToggle();
+                // Load data for the selected variable
+                $.get(`/api/data/dataset/${currentDatasetId}/variable/${variableId}/data`, function(data) {
+                    initializeDataTable(data);
+                });
             });
 
             // Handle dataset deletion
-            $(document).on('click', '.delete-dataset', function() {
-                const datasetId = $(this).data('dataset-id');
-                const datasetName = $(this).data('dataset-name');
-                $('#deleteDatasetName').text(datasetName);
-                $('#confirmDelete').data('dataset-id', datasetId);
+            $('#deleteDatasetBtn').on('click', function() {
                 $('#deleteConfirmModal').modal('show');
             });
 
-            $('#confirmDelete').on('click', function() {
-                const datasetId = $(this).data('dataset-id');
+            $('#confirmDeleteBtn').on('click', function() {
+                if (!currentDatasetId) return;
+
                 $.ajax({
-                    url: `/api/data/datasets/${datasetId}`,
+                    url: `/api/data/dataset/${currentDatasetId}`,
                     method: 'DELETE',
                     success: function() {
                         location.reload();
                     },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        console.error('Failed to delete dataset:', textStatus, errorThrown);
-                        alert('Failed to delete dataset. Please try again.');
+                    error: function(xhr) {
+                        alert('Failed to delete dataset: ' + xhr.responseText);
                     }
                 });
             });
-
-            // Log initial state
-            console.log('Page loaded. Number of datasets:', $('.dataset-selector').length);
         });
     </script>
 }

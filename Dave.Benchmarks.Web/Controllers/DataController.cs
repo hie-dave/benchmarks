@@ -101,19 +101,20 @@ public class DataController : Controller
         return Ok(metadata);
     }
 
-    [HttpGet("api/data/variables")]
+    [HttpGet("api/data/dataset/{datasetId}/variables")]
     public async Task<ActionResult<IEnumerable<Variable>>> GetVariables(int datasetId)
     {
-        var dataset = await _dbContext.Datasets
-            .Include(d => d.Variables)
-                .ThenInclude(v => v.Layers)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(d => d.Id == datasetId);
+        // Load variables directly from DbContext to get proper IQueryable
+        var variables = await _dbContext.Variables
+            .Include(v => v.Layers)
+            .Where(v => v.DatasetId == datasetId)
+            .OrderBy(v => v.Name)
+            .ToListAsync();
 
-        if (dataset == null)
-            return NotFound($"Dataset {datasetId} not found");
+        if (!variables.Any())
+            return NotFound($"No variables found for dataset {datasetId}");
 
-        return Ok(dataset.Variables);
+        return Ok(variables);
     }
 
     [HttpGet("api/data/layers")]
@@ -154,7 +155,7 @@ public class DataController : Controller
         return Ok(data);
     }
 
-    [HttpGet("api/data/datasets/{datasetId}")]
+    [HttpGet("api/data/dataset/{datasetId}")]
     public async Task<ActionResult<Dataset>> GetDataset(int datasetId)
     {
         var dataset = await _dbContext.Datasets
@@ -169,7 +170,7 @@ public class DataController : Controller
         return Ok(dataset);
     }
 
-    [HttpGet("api/data/datasets/{datasetId}/variables/{variableId}/data")]
+    [HttpGet("api/data/dataset/{datasetId}/variable/{variableId}/data")]
     public async Task<ActionResult<IEnumerable<object>>> GetVariableData(int datasetId, int variableId)
     {
         var variable = await _dbContext.Variables
@@ -283,6 +284,32 @@ public class DataController : Controller
         }
 
         return Ok(data);
+    }
+
+    private async Task<int> GetVariableRowCount(int variableId)
+    {
+        var variable = await _dbContext.Variables
+            .FirstOrDefaultAsync(v => v.Id == variableId);
+
+        if (variable == null)
+            return 0;
+
+        return variable.Level switch
+        {
+            AggregationLevel.Gridcell => await _dbContext.GridcellData
+                .Where(d => d.VariableId == variableId)
+                .CountAsync(),
+            AggregationLevel.Stand => await _dbContext.StandData
+                .Where(d => d.VariableId == variableId)
+                .CountAsync(),
+            AggregationLevel.Patch => await _dbContext.PatchData
+                .Where(d => d.VariableId == variableId)
+                .CountAsync(),
+            AggregationLevel.Individual => await _dbContext.IndividualData
+                .Where(d => d.VariableId == variableId)
+                .CountAsync(),
+            _ => 0
+        };
     }
 
     [HttpDelete("api/data/datasets/{id}")]
