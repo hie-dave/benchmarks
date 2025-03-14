@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# Resets the database by dropping all tables from the dave_benchmarks database.
+#
+# This script relies on unix socket authentication, and mariaDB must be running.
+#
+# Usage: resetdb
+#
+set -euo pipefail
+
+SQL_FILE="$(mktemp)"
+
+# First, get the list of tables and generate DROP statements
+mariadb -u dave -D dave_benchmarks -N -e "
+SELECT CONCAT('DROP TABLE IF EXISTS \`', table_name, '\`;')
+FROM information_schema.tables 
+WHERE table_schema = 'dave_benchmarks';" > "${SQL_FILE}"
+
+# Now execute the DROP statements
+mariadb -u dave -D dave_benchmarks -e "
+SET FOREIGN_KEY_CHECKS = 0;
+source ${SQL_FILE}
+SET FOREIGN_KEY_CHECKS = 1;"
+
+rm -f "${SQL_FILE}"
