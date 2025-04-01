@@ -343,6 +343,9 @@ public class DataController : Controller
 
         try 
         {
+            // Note: DB context is not configured for cascade deletion of
+            // related datasets by default, so we need to manually delete them.
+            _dbContext.Datasets.RemoveRange(group.Datasets);
             _dbContext.DatasetGroups.Remove(group);
             await _dbContext.SaveChangesAsync();
             return Ok(new { success = true });

@@ -94,7 +94,7 @@
                     return;
                 }
 
-                $.get(`/api/data/datasets/${datasetId}/variables`, function(variables) {
+                $.get(`/api/data/dataset/${datasetId}/variables`, function(variables) {
                     let options = '<option value="">Select a variable...</option>';
                     variables.forEach(v => {
                         const optgroup = $('<optgroup>').attr('label', v.name).attr('data-layers', JSON.stringify(v.layers));
@@ -137,9 +137,9 @@
                 if (!datasetId || !variableId) return;
 
                 // First get the time resolution
-                $.get(`/api/data/datasets/${datasetId}/variables/${variableId}/timeresolution`, function(resolution) {
+                @* $.get(`/api/data/dataset/${datasetId}/variable/${variableId}/timeresolution`, function(resolution) { *@
                     // Then get the data and plot with the correct format
-                    let url = `/api/data/datasets/${datasetId}/variables/${variableId}/data`;
+                    let url = `/api/data/dataset/${datasetId}/variable/${variableId}/data`;
                     const params = new URLSearchParams();
                     
                     if (layerId) params.append('layerId', layerId);
@@ -190,7 +190,7 @@
 
                         Plotly.newPlot('plot', traces, layout);
                     });
-                });
+                @* }); *@
             }
 
             // Event handlers

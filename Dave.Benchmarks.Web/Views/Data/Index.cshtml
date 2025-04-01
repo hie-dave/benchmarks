@@ -66,10 +66,13 @@
                         </select>
                     </div>
 
-                    <!-- Delete Button -->
+                    <!-- Delete Buttons -->
                     <div class="mt-3">
-                        <button class="btn btn-danger w-100" id="deleteDatasetBtn" style="display: none;">
+                        <button class="btn btn-danger w-100 mb-2" id="deleteDatasetBtn" style="display: none;">
                             <i class="bi bi-trash"></i> Delete Dataset
+                        </button>
+                        <button class="btn btn-danger w-100" id="deleteGroupBtn" style="display: none;">
+                            <i class="bi bi-trash"></i> Delete Group
                         </button>
                     </div>
                 </div>
@@ -102,11 +105,11 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Confirm Delete</h5>
+                <h5 class="modal-title" id="deleteConfirmTitle">Confirm Delete</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                Are you sure you want to delete this dataset? This action cannot be undone.
+            <div class="modal-body" id="deleteConfirmMessage">
+                Are you sure you want to delete this item?
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -126,6 +129,21 @@
         $(document).ready(function() {
             let dataTable = null;
             let currentDatasetId = null;
+            let currentGroupId = null;
+            let deleteType = null;
+
+            function updateDeleteButtons() {
+                // Hide both buttons initially
+                $('#deleteDatasetBtn, #deleteGroupBtn').hide();
+                
+                // Show appropriate button based on current state
+                if (currentDatasetId) {
+                    $('#deleteDatasetBtn').show();
+                }
+                if (currentGroupId) {
+                    $('#deleteGroupBtn').show();
+                }
+            }
 
             function initializeDataTable(data) {
                 if (dataTable) {
@@ -156,7 +174,9 @@
             function resetSelectors() {
                 $('#datasetSelect').prop('disabled', true).val('');
                 $('#variableSelect').prop('disabled', true).val('');
-                $('#deleteDatasetBtn').hide();
+                currentDatasetId = null;
+                currentGroupId = null;
+                updateDeleteButtons();
                 $('#datasetSelectContainer').hide();
                 if (dataTable) dataTable.clear().draw();
             }
@@ -174,11 +194,71 @@
                 });
 
                 // Show delete button and update info
-                $('#deleteDatasetBtn').show();
                 $.get(`/api/data/dataset/${datasetId}`, function(dataset) {
                     updateDatasetInfo(dataset);
                 });
             }
+
+            function loadDatasetsForGroup(id) {
+                // Load datasets for the selected group
+                $.get(`/api/data/group/${id}`, function(group) {
+                    const select = $('#datasetSelect');
+                    select.empty().append('<option value="">Select dataset...</option>');
+                    
+                    group.datasets.forEach(dataset => {
+                        select.append(`<option value="${dataset.id}">${dataset.name} (${dataset.variables.length} variables)</option>`);
+                    });
+                    
+                    select.prop('disabled', false);
+                    $('#datasetSelectContainer').show();
+                });
+            }
+
+            function onVariableSelected(variableId) {
+                // Load data for the selected variable
+                $.get(`/api/data/dataset/${currentDatasetId}/variable/${variableId}/data`, function(data) {
+                    initializeDataTable(data);
+                });
+            }
+
+            function onPageLoad() {
+                // Check initial selection on page load
+                const selected = $('#datasetGroupSelect').find(':selected');
+                const selectedDataset = $('#datasetSelect').find(':selected');
+                const selectedVariable = $('#variableSelect').find(':selected');
+                const initialType = selected.data('type');
+                const initialId = selected.data('id');
+                //resetSelectors();
+
+                if (initialType === 'dataset') {
+                    currentDatasetId = initialId;
+                    loadVariablesForDataset(initialId);
+                    if (selectedVariable.data('id')) {
+                        onVariableSelected(selectedVariable.data('id'));
+                    }
+                } else if (initialType === 'group') {
+                    currentGroupId = initialId;
+                    loadDatasetsForGroup(initialId);
+
+                    if (selectedDataset.data('id')) {
+                        currentDatasetId = selectedDataset.data('id');
+                        loadVariablesForDataset(currentDatasetId);
+                        if (selectedVariable.data('id')) {
+                            onVariableSelected(selectedVariable.data('id'));
+                        }
+                    }
+                }
+
+                if (!currentDatasetId) {
+                    $('#variableSelect').prop('disabled', true);
+                }
+                if (!currentGroupId || initialType == 'dataset') {
+                    $('#datasetSelect').prop('disabled', true);
+                }
+
+                updateDeleteButtons();
+            }
+            onPageLoad();
 
             // Handle group/dataset selection
             $('#datasetGroupSelect').on('change', function() {
@@ -186,45 +266,42 @@
                 const type = selected.data('type');
                 const id = selected.data('id');
 
+                currentDatasetId = null;
+                currentGroupId = null;
+
+                // Rest of the existing change handler code...
                 // Reset all dependent controls
                 resetSelectors();
 
-                if (!type || !id) return;
+                if (!id) return;
 
                 if (type === 'group') {
-                    // Load datasets for the selected group
-                    $.get(`/api/data/group/${id}`, function(group) {
-                        const select = $('#datasetSelect');
-                        select.empty().append('<option value="">Select dataset...</option>');
-                        
-                        group.datasets.forEach(dataset => {
-                            select.append(`<option value="${dataset.id}">${dataset.name} (${dataset.variables.length} variables)</option>`);
-                        });
-                        
-                        select.prop('disabled', false);
-                        $('#datasetSelectContainer').show();
-                    });
+                    currentGroupId = id;
+                    loadDatasetsForGroup(id);
                 } else {
                     // Direct dataset selection
                     currentDatasetId = id;
                     loadVariablesForDataset(id);
                 }
+
+                updateDeleteButtons();
             });
 
             // Handle dataset selection from group
             $('#datasetSelect').on('change', function() {
                 const datasetId = $(this).val();
-                currentDatasetId = datasetId;
                 
-                // Reset variable selector and table
                 $('#variableSelect').prop('disabled', true).val('');
-                if (dataTable) dataTable.clear().draw();
-                
+                if (dataTable) {
+                    dataTable.clear().draw();
+                }
+
                 if (!datasetId) {
-                    $('#deleteDatasetBtn').hide();
                     return;
                 }
 
+                currentDatasetId = datasetId;
+                updateDeleteButtons();
                 loadVariablesForDataset(datasetId);
             });
 
@@ -236,28 +313,43 @@
                     return;
                 }
 
-                // Load data for the selected variable
-                $.get(`/api/data/dataset/${currentDatasetId}/variable/${variableId}/data`, function(data) {
-                    initializeDataTable(data);
-                });
+                onVariableSelected(variableId);
             });
 
             // Handle dataset deletion
             $('#deleteDatasetBtn').on('click', function() {
+                if (!currentDatasetId) return;
+                deleteType = 'dataset';
+                $('#deleteConfirmTitle').text('Delete Dataset');
+                $('#deleteConfirmMessage').text('Are you sure you want to delete this dataset? This action cannot be undone.');
+                $('#deleteConfirmModal').modal('show');
+            });
+
+            $('#deleteGroupBtn').on('click', function() {
+                if (!currentGroupId) return;
+                deleteType = 'group';
+                $('#deleteConfirmTitle').text('Delete Group');
+                $('#deleteConfirmMessage').text('Are you sure you want to delete this entire group and all its datasets? This action cannot be undone.');
                 $('#deleteConfirmModal').modal('show');
             });
 
             $('#confirmDeleteBtn').on('click', function() {
-                if (!currentDatasetId) return;
+                const url = deleteType === 'dataset' 
+                    ? `/api/data/dataset/${currentDatasetId}`
+                    : `/api/data/group/${currentGroupId}`;
+
+                if (!url) return;
 
                 $.ajax({
-                    url: `/api/data/dataset/${currentDatasetId}`,
+                    url: url,
                     method: 'DELETE',
                     success: function() {
+                        $('#deleteConfirmModal').modal('hide');
+                        // Refresh the page to show updated data
                         location.reload();
                     },
                     error: function(xhr) {
-                        alert('Failed to delete dataset: ' + xhr.responseText);
+                        alert('Error deleting ' + deleteType + ': ' + xhr.responseText);
                     }
                 });
             });
