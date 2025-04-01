@@ -312,7 +312,7 @@ public class DataController : Controller
         };
     }
 
-    [HttpDelete("api/data/datasets/{id}")]
+    [HttpDelete("api/data/dataset/{id}")]
     public async Task<ActionResult> DeleteDataset(int id)
     {
         var dataset = await _dbContext.Datasets.FindAsync(id);
@@ -331,7 +331,7 @@ public class DataController : Controller
         }
     }
 
-    [HttpDelete("api/data/groups/{id}")]
+    [HttpDelete("api/data/group/{id}")]
     public async Task<ActionResult> DeleteGroup(int id)
     {
         var group = await _dbContext.DatasetGroups
