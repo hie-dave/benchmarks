@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Dave.Benchmarks.Web.Extensions;
 
 namespace Dave.Benchmarks.Web.Controllers;
 
@@ -40,10 +41,17 @@ public class DataController : Controller
         var datasets = await _dbContext.Datasets
             .Include(d => d.Variables)
                 .ThenInclude(v => v.Layers)
+            .Include(d => d.Group)
             .AsSplitQuery()
             .ToListAsync();
 
-        return View(datasets);
+        // Group datasets
+        var groupedDatasets = datasets
+            .GroupBy(d => d.Group)
+            .OrderBy(g => g.Key?.Name ?? "")
+            .ToList();
+
+        return View(groupedDatasets);
     }
 
     [HttpGet("api/data/datasets")]
@@ -82,6 +90,20 @@ public class DataController : Controller
             return NotFound($"Group {groupId} not found");
 
         return Ok(group);
+    }
+
+    [HttpGet("api/data/group/{groupId}/datasets")]
+    public async Task<ActionResult<IEnumerable<Dataset>>> GetDatasetsInGroup(int groupId)
+    {
+        var group = await _dbContext.DatasetGroups
+            .Include(g => g.Datasets)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(g => g.Id == groupId);
+
+        if (group == null)
+            return NotFound($"Group {groupId} not found");
+
+        return Ok(group.Datasets);
     }
 
     [HttpGet("api/data/dataset/{datasetId}/metadata")]
@@ -171,7 +193,10 @@ public class DataController : Controller
     }
 
     [HttpGet("api/data/dataset/{datasetId}/variable/{variableId}/data")]
-    public async Task<ActionResult<IEnumerable<object>>> GetVariableData(int datasetId, int variableId)
+    public async Task<ActionResult<IEnumerable<object>>> GetVariableData(
+        int datasetId,
+        int variableId,
+        int? layerId = null)
     {
         var variable = await _dbContext.Variables
             .Include(v => v.Dataset)
@@ -183,12 +208,14 @@ public class DataController : Controller
 
         // Get the first 1000 data points for this variable
         IQueryable<object> query;
-        
+        Func<Datum, bool> filterLayers = layerId != null ? d => d.LayerId == layerId : d => true;
+
         switch (variable.Level)
         {
             case AggregationLevel.Gridcell:
                 query = _dbContext.GridcellData
                     .Where(d => d.VariableId == variableId)
+                    .FilterLayers(layerId)
                     .Include(d => d.Layer)
                     .OrderBy(d => d.Timestamp)
                     .Take(1000)
@@ -205,6 +232,7 @@ public class DataController : Controller
             case AggregationLevel.Stand:
                 query = _dbContext.StandData
                     .Where(d => d.VariableId == variableId)
+                    .FilterLayers(layerId)
                     .Include(d => d.Layer)
                     .OrderBy(d => d.Timestamp)
                     .Take(1000)
@@ -222,6 +250,7 @@ public class DataController : Controller
             case AggregationLevel.Patch:
                 query = _dbContext.PatchData
                     .Where(d => d.VariableId == variableId)
+                    .FilterLayers(layerId)
                     .Include(d => d.Layer)
                     .OrderBy(d => d.Timestamp)
                     .Take(1000)
@@ -240,6 +269,7 @@ public class DataController : Controller
             case AggregationLevel.Individual:
                 query = _dbContext.IndividualData
                     .Where(d => d.VariableId == variableId)
+                    .FilterLayers(layerId)
                     .Include(d => d.Layer)
                     .Include(d => d.Individual)
                         .ThenInclude(i => i.Pft)
@@ -284,6 +314,19 @@ public class DataController : Controller
         }
 
         return Ok(data);
+    }
+
+    [HttpGet("api/data/dataset/{datasetId}/variable/{variableId}/layers")]
+    public async Task<ActionResult<IEnumerable<VariableLayer>>> GetVariableLayers(int datasetId, int variableId)
+    {
+        var variable = await _dbContext.Variables
+            .Include(v => v.Layers)
+            .FirstOrDefaultAsync(v => v.Id == variableId && v.DatasetId == datasetId);
+
+        if (variable == null)
+            return NotFound($"Variable {variableId} not found in dataset {datasetId}");
+
+        return Ok(variable.Layers);
     }
 
     private async Task<int> GetVariableRowCount(int variableId)

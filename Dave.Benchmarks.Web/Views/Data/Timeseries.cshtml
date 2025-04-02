@@ -1,4 +1,5 @@
-@model IEnumerable<Dave.Benchmarks.Core.Models.Entities.Dataset>
+@using Dave.Benchmarks.Core.Models.Entities
+@model IEnumerable<IGrouping<DatasetGroup?, Dataset>>
 @{
     ViewData["Title"] = "Timeseries Plot";
 }
@@ -9,13 +10,44 @@
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="form-group">
-                <label for="dataset">Dataset</label>
-                <select class="form-control" id="dataset">
-                    <option value="">Select a dataset...</option>
-                    @foreach (var dataset in Model)
-                    {
-                        <option value="@dataset.Id">@dataset.Name</option>
+                <label for="datasetGroupSelect">Dataset Group or Dataset</label>
+                <select class="form-control" id="datasetGroupSelect">
+                    <option value="">Select...</option>
+                    <!-- Ungrouped Datasets -->
+                    @{
+                        var ungroupedDatasets = Model.FirstOrDefault(g => g.Key == null);
+                        if (ungroupedDatasets != null && ungroupedDatasets.Any())
+                        {
+                            <optgroup label="Ungrouped Datasets">
+                                @foreach (var dataset in ungroupedDatasets)
+                                {
+                                    <option value="dataset-@dataset.Id" data-type="dataset" data-id="@dataset.Id">
+                                        @dataset.Name (@dataset.Variables.Count) variables
+                                    </option>
+                                }
+                            </optgroup>
+                        }
                     }
+                    <!-- Dataset Groups -->
+                    @if (Model.Any(g => g.Key != null))
+                    {
+                        <optgroup label="Dataset Groups">
+                            @foreach (var group in Model.Where(g => g.Key != null))
+                            {
+                                <option value="group-@group.Key!.Id" data-type="group" data-id="@group.Key!.Id">
+                                    @group.Key!.Name (@group.Count() datasets, @group.Sum(d => d.Variables.Count) variables)
+                                </option>
+                            }
+                        </optgroup>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="datasetSelect">Dataset</label>
+                <select class="form-control" id="datasetSelect" disabled>
+                    <option value="">Select dataset...</option>
                 </select>
             </div>
         </div>
@@ -35,6 +67,8 @@
                 </select>
             </div>
         </div>
+    </div>
+    <div class="row mb-4">
         <div class="col-md-3">
             <div class="form-group">
                 <label for="timeRange">Time Range</label>
@@ -54,90 +88,142 @@
     
     <script>
         $(document).ready(function() {
-            const $dataset = $('#dataset');
-            const $variable = $('#variable');
-            const $layer = $('#layer');
-            const $timeRange = $('#timeRange');
+            const datasetGroupSelect = $('#datasetGroupSelect');
+            const datasetSelect = $('#datasetSelect');
+            const variable = $('#variable');
+            const layer = $('#layer');
+            const timeRange = $('#timeRange');
             
             let startDate = null;
             let endDate = null;
+            let currentDatasetId = null;
+            let currentGroupId = null;
 
             // Initialize date range picker
-            $timeRange.daterangepicker({
+            timeRange.daterangepicker({
                 autoUpdateInput: false,
                 locale: {
                     cancelLabel: 'Clear'
                 }
             });
 
-            $timeRange.on('apply.daterangepicker', function(ev, picker) {
+            timeRange.on('apply.daterangepicker', function(ev, picker) {
                 $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
                 startDate = picker.startDate.format('YYYY-MM-DD');
                 endDate = picker.endDate.format('YYYY-MM-DD');
                 updatePlot();
             });
 
-            $timeRange.on('cancel.daterangepicker', function(ev, picker) {
+            timeRange.on('cancel.daterangepicker', function(ev, picker) {
                 $(this).val('');
                 startDate = null;
                 endDate = null;
                 updatePlot();
             });
 
-            function updateVariables() {
-                const datasetId = $dataset.val();
-                if (!datasetId) {
-                    $variable.prop('disabled', true).html('<option value="">Select a variable...</option>');
-                    $layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
-                    $timeRange.prop('disabled', true).val('');
-                    Plotly.purge('plot');
+            // Dataset Group/Dataset selection
+            datasetGroupSelect.on('change', function() {
+                const selected = $(this).find(':selected');
+                const type = selected.data('type');
+                const id = selected.data('id');
+
+                if (!type || !id) {
+                    resetSelections();
                     return;
                 }
 
-                $.get(`/api/data/dataset/${datasetId}/variables`, function(variables) {
-                    let options = '<option value="">Select a variable...</option>';
-                    variables.forEach(v => {
-                        const optgroup = $('<optgroup>').attr('label', v.name).attr('data-layers', JSON.stringify(v.layers));
-                        optgroup.append($('<option>').val(v.id).text(v.name));
-                        options += optgroup.prop('outerHTML');
+                if (type === 'dataset') {
+                    currentDatasetId = id;
+                    currentGroupId = null;
+                    datasetSelect.prop('disabled', true).html('<option value="">Select dataset...</option>');
+                    updateVariables();
+                } else if (type === 'group') {
+                    currentGroupId = id;
+                    currentDatasetId = null;
+                    loadDatasetsInGroup(id);
+                }
+            });
+
+            // Dataset selection (for groups)
+            datasetSelect.on('change', function() {
+                currentDatasetId = $(this).val();
+                if (!currentDatasetId) {
+                    resetVariableAndLayer();
+                    return;
+                }
+                updateVariables();
+            });
+
+            function loadDatasetsInGroup(groupId) {
+                $.get(`/api/data/group/${groupId}/datasets`, function(datasets) {
+                    let options = '<option value="">Select dataset...</option>';
+                    datasets.forEach(d => {
+                        @* This API endpoint doesn't return the variables. *@
+                        options += `<option value="${d.id}">${d.name}</option>`;
                     });
-                    $variable.html(options).prop('disabled', false);
-                    $layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
-                    $timeRange.prop('disabled', true).val('');
-                    Plotly.purge('plot');
+                    datasetSelect.html(options).prop('disabled', false);
+                    resetVariableAndLayer();
                 });
             }
 
-            function updateLayers() {
-                const variableId = $variable.val();
-                if (!variableId) {
-                    $layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
-                    $timeRange.prop('disabled', true).val('');
-                    Plotly.purge('plot');
+            function updateVariables() {
+                if (!currentDatasetId) {
+                    resetVariableAndLayer();
                     return;
                 }
 
-                const selectedOptgroup = $variable.find('option:selected').parent('optgroup');
-                if (selectedOptgroup.length) {
-                    const layers = JSON.parse(selectedOptgroup.attr('data-layers') || '[]');
+                $.get(`/api/data/dataset/${currentDatasetId}/variables`, function(variables) {
+                    let options = '<option value="">Select a variable...</option>';
+                    variables.forEach(v => {
+                        options += `<option value="${v.id}">${v.name}</option>`;
+                    });
+                    variable.html(options).prop('disabled', false);
+                    layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
+                    timeRange.prop('disabled', false);
+                });
+            }
+
+            function updateLayers(variableId) {
+                if (!currentDatasetId || !variableId) {
+                    layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
+                    return;
+                }
+
+                $.get(`/api/data/dataset/${currentDatasetId}/variable/${variableId}/layers`, function(layers) {
                     let options = '<option value="">All Layers</option>';
                     layers.forEach(l => {
                         options += `<option value="${l.id}">${l.name}</option>`;
                     });
-                    $layer.html(options).prop('disabled', false);
-                    $timeRange.prop('disabled', false);
-                }
+                    layer.html(options).prop('disabled', layers.length === 0);
+                }).fail(function(error) {
+                    console.error('Error loading layers:', error);
+                    layer.prop('disabled', true).html('<option value="">Error loading layers</option>');
+                });
+            }
+
+            function resetSelections() {
+                currentDatasetId = null;
+                currentGroupId = null;
+                datasetSelect.prop('disabled', true).html('<option value="">Select dataset...</option>');
+                resetVariableAndLayer();
+            }
+
+            function resetVariableAndLayer() {
+                variable.prop('disabled', true).html('<option value="">Select a variable...</option>');
+                layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
+                timeRange.prop('disabled', true).val('');
+                Plotly.purge('plot');
             }
 
             function updatePlot() {
-                const datasetId = $dataset.val();
-                const variableId = $variable.val();
-                const layerId = $layer.val();
+                const datasetId = currentDatasetId;
+                const variableId = variable.val();
+                const layerId = layer.val();
 
                 if (!datasetId || !variableId) return;
 
                 // First get the time resolution
-                @* $.get(`/api/data/dataset/${datasetId}/variable/${variableId}/timeresolution`, function(resolution) { *@
+                // $.get(`/api/data/dataset/${datasetId}/variable/${variableId}/timeresolution`, function(resolution) {
                     // Then get the data and plot with the correct format
                     let url = `/api/data/dataset/${datasetId}/variable/${variableId}/data`;
                     const params = new URLSearchParams();
@@ -177,26 +263,29 @@
 
                         const traces = Object.values(layerGroups);
                         const layout = {
-                            title: `${$variable.find('option:selected').text()} over time`,
+                            title: `${variable.find('option:selected').text()} over time`,
                             xaxis: {
                                 title: 'Time',
                                 type: 'date'
                             },
                             yaxis: {
-                                title: $variable.find('option:selected').text()
+                                title: variable.find('option:selected').text()
                             },
                             showlegend: true
                         };
 
                         Plotly.newPlot('plot', traces, layout);
                     });
-                @* }); *@
+                // });
             }
 
             // Event handlers
-            $dataset.change(updateVariables);
-            $variable.change(updateLayers);
-            $layer.change(updatePlot);
+            variable.change(function() {
+                const variableId = $(this).val();
+                updateLayers(variableId);
+            });
+
+            layer.change(updatePlot);
         });
     </script>
 }
