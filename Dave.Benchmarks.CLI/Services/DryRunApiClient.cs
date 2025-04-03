@@ -50,4 +50,42 @@ public class DryRunApiClient : IApiClient
         logger.LogInformation("[DRY RUN] Would complete group {GroupId}", groupId);
         return Task.CompletedTask;
     }
+
+    public Task DeleteGroupAsync(int groupId)
+    {
+        logger.LogInformation("[DRY RUN] Would delete group {GroupId}", groupId);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> CreateVariableAsync(int datasetId, CreateVariableRequest request)
+    {
+        logger.LogInformation(
+            "[DRY RUN] Would create variable {Name} in dataset {DatasetId} with level {Level} and units {Units}",
+            request.Name,
+            datasetId,
+            request.Level,
+            request.Units);
+
+        return Task.FromResult(1); // Return dummy ID
+    }
+
+    public Task<int> CreateLayerAsync(int variableId, CreateLayerRequest request)
+    {
+        logger.LogInformation(
+            "[DRY RUN] Would create layer {Name} in variable {VariableId}",
+            request.Name,
+            variableId);
+
+        return Task.FromResult(1); // Return dummy ID
+    }
+
+    public Task AppendDataAsync(int layerId, AppendDataRequest request)
+    {
+        logger.LogInformation(
+            "[DRY RUN] Would append {Count} data points to layer {LayerId}",
+            request.DataPoints.Count,
+            layerId);
+
+        return Task.CompletedTask;
+    }
 }

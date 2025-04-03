@@ -172,6 +172,9 @@ public class ImportHandler
         if (outputFiles.Length == 0)
             return;
 
+        // Build the lookup table for this site's output files
+        resolver.BuildLookupTable(insParser);
+
         DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
 
         // Create group.
@@ -180,30 +183,41 @@ public class ImportHandler
             options.Name,
             options.Description); // TODO: metadata
 
-        // Create dataset
-        int datasetId = await apiClient.CreateDatasetAsync(
-            options.Name,
-            options.Description,
-            repoInfo,
-            options.ClimateDataset,
-            options.TemporalResolution,
-            "{}", // TODO: metadata
-            groupId);
-
-        // Process each output file, skipping stale ones
-        foreach (string outputFile in outputFiles)
+        try
         {
-            if (IsStaleFile(outputFile, mostRecentWriteTime))
+
+            // Create dataset
+            int datasetId = await apiClient.CreateDatasetAsync(
+                options.Name,
+                options.Description,
+                repoInfo,
+                options.ClimateDataset,
+                options.TemporalResolution,
+                "{}", // TODO: metadata
+                groupId);
+
+            // Process each output file, skipping stale ones
+            foreach (string outputFile in outputFiles)
             {
-                EmitStaleFileWarning(outputFile, mostRecentWriteTime);
-                continue;
+                if (IsStaleFile(outputFile, mostRecentWriteTime))
+                {
+                    EmitStaleFileWarning(outputFile, mostRecentWriteTime);
+                    continue;
+                }
+
+                // Parse the output file.
+                Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
+
+                // Add it to the dataset.
+                await apiClient.AddQuantityAsync(datasetId, quantity);
             }
-
-            // Parse the output file.
-            Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
-
-            // Add it to the dataset.
-            await apiClient.AddQuantityAsync(datasetId, quantity);
+        }
+        catch
+        {
+            // Delete group (this will also delete all datasets in the group).
+            logger.LogInformation("Import failed; deleting group {GroupId}", groupId);
+            await apiClient.DeleteGroupAsync(groupId);
+            throw;
         }
     }
 
@@ -228,67 +242,77 @@ public class ImportHandler
             options.Name,
             options.Description); // TODO: metadata
 
-        foreach ((string siteName, string instructionFile, string outputDir) in runs)
+        try
         {
-            using var __ = logger.BeginScope(siteName);
-
-            // Parse instruction file
-            string parameters = await insParser.ParseInstructionFileAsync(instructionFile);
-            string gridlist = insParser.GetGridlist();
-            IEnumerable<Coordinate> coordinates = await gridlistParser.Parse(gridlist);
-            if (coordinates.Count() > 1)
-                ExceptionHelper.Throw<InvalidDataException>(logger, $"Parser error: site {siteName} has more than one coordinate");
-
-            // Build the lookup table for this site's output files
-            resolver.BuildLookupTable(insParser);
-
-            // Get all output files and find most recent write time
-            string[] outputFiles = EnumerateOutputFiles(outputDir);
-            if (!outputFiles.Any())
+            foreach ((string siteName, string instructionFile, string outputDir) in runs)
             {
-                // GetMostRecentWriteTime() will throw on empty collections.
-                logger.LogWarning("Site {siteName} has no output files", siteName);
-                continue;
-            }
+                using var __ = logger.BeginScope(siteName);
 
-            // Get most recent write time for this site.
-            DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
+                // Parse instruction file
+                string parameters = await insParser.ParseInstructionFileAsync(instructionFile);
+                string gridlist = insParser.GetGridlist();
+                IEnumerable<Coordinate> coordinates = await gridlistParser.Parse(gridlist);
+                if (coordinates.Count() > 1)
+                    ExceptionHelper.Throw<InvalidDataException>(logger, $"Parser error: site {siteName} has more than one coordinate");
 
-            if ((globalTimestamp - mostRecentWriteTime).TotalSeconds > staleSiteThresholdSeconds)
-            {
-                logger.LogWarning("Site {siteName} is stale (age: {age})", siteName, TimeUtils.FormatTimeSpan(globalTimestamp - mostRecentWriteTime));
-                continue;
-            }
+                // Build the lookup table for this site's output files
+                resolver.BuildLookupTable(insParser);
 
-            Coordinate coordinate = coordinates.Single();
-            logger.LogInformation("Creating site-level dataset");
-            int datasetId = await apiClient.CreateDatasetAsync(
-                siteName,
-                $"{options.Name} - {siteName}",
-                repoInfo,
-                options.ClimateDataset,
-                options.TemporalResolution,
-                "{}", // TODO: metadata
-                groupId);
-
-            // Process each output file, skipping stale ones
-            foreach (string outputFile in outputFiles)
-            {
-                using var ___ = logger.BeginScope(Path.GetFileName(outputFile));
-                if (IsStaleFile(outputFile, mostRecentWriteTime))
+                // Get all output files and find most recent write time
+                string[] outputFiles = EnumerateOutputFiles(outputDir);
+                if (!outputFiles.Any())
                 {
-                    EmitStaleFileWarning(outputFile, mostRecentWriteTime);
+                    // GetMostRecentWriteTime() will throw on empty collections.
+                    logger.LogWarning("Site {siteName} has no output files", siteName);
                     continue;
                 }
 
-                string variableName = Path.GetFileNameWithoutExtension(outputFile);
+                // Get most recent write time for this site.
+                DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
 
-                // Parse the output file.
-                Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
+                if ((globalTimestamp - mostRecentWriteTime).TotalSeconds > staleSiteThresholdSeconds)
+                {
+                    logger.LogWarning("Site {siteName} is stale (age: {age})", siteName, TimeUtils.FormatTimeSpan(globalTimestamp - mostRecentWriteTime));
+                    continue;
+                }
 
-                // Add it to the dataset.
-                await apiClient.AddQuantityAsync(datasetId, quantity);
+                Coordinate coordinate = coordinates.Single();
+                logger.LogInformation("Creating site-level dataset");
+                int datasetId = await apiClient.CreateDatasetAsync(
+                    siteName,
+                    $"{options.Name} - {siteName}",
+                    repoInfo,
+                    options.ClimateDataset,
+                    options.TemporalResolution,
+                    "{}", // TODO: metadata
+                    groupId);
+
+                // Process each output file, skipping stale ones
+                foreach (string outputFile in outputFiles)
+                {
+                    using var ___ = logger.BeginScope(Path.GetFileName(outputFile));
+                    if (IsStaleFile(outputFile, mostRecentWriteTime))
+                    {
+                        EmitStaleFileWarning(outputFile, mostRecentWriteTime);
+                        continue;
+                    }
+
+                    string variableName = Path.GetFileNameWithoutExtension(outputFile);
+
+                    // Parse the output file.
+                    Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
+
+                    // Add it to the dataset.
+                    await apiClient.AddQuantityAsync(datasetId, quantity);
+                }
             }
+        }
+        catch
+        {
+            // Delete group (this will also delete all datasets in the group).
+            logger.LogInformation("Import failed; deleting group {GroupId}", groupId);
+            await apiClient.DeleteGroupAsync(groupId);
+            throw;
         }
     }
 }

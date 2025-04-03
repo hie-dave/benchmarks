@@ -68,14 +68,6 @@
             </div>
         </div>
     </div>
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="form-group">
-                <label for="timeRange">Time Range</label>
-                <input type="text" class="form-control" id="timeRange" disabled />
-            </div>
-        </div>
-    </div>
 
     <div id="plot" style="width: 100%; height: 600px;"></div>
 </div>
@@ -92,34 +84,9 @@
             const datasetSelect = $('#datasetSelect');
             const variable = $('#variable');
             const layer = $('#layer');
-            const timeRange = $('#timeRange');
-            
-            let startDate = null;
-            let endDate = null;
+
             let currentDatasetId = null;
             let currentGroupId = null;
-
-            // Initialize date range picker
-            timeRange.daterangepicker({
-                autoUpdateInput: false,
-                locale: {
-                    cancelLabel: 'Clear'
-                }
-            });
-
-            timeRange.on('apply.daterangepicker', function(ev, picker) {
-                $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
-                startDate = picker.startDate.format('YYYY-MM-DD');
-                endDate = picker.endDate.format('YYYY-MM-DD');
-                updatePlot();
-            });
-
-            timeRange.on('cancel.daterangepicker', function(ev, picker) {
-                $(this).val('');
-                startDate = null;
-                endDate = null;
-                updatePlot();
-            });
 
             // Dataset Group/Dataset selection
             datasetGroupSelect.on('change', function() {
@@ -179,7 +146,6 @@
                     });
                     variable.html(options).prop('disabled', false);
                     layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
-                    timeRange.prop('disabled', false);
                 });
             }
 
@@ -211,7 +177,6 @@
             function resetVariableAndLayer() {
                 variable.prop('disabled', true).html('<option value="">Select a variable...</option>');
                 layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
-                timeRange.prop('disabled', true).val('');
                 Plotly.purge('plot');
             }
 
@@ -229,8 +194,6 @@
                     const params = new URLSearchParams();
                     
                     if (layerId) params.append('layerId', layerId);
-                    if (startDate) params.append('startTime', startDate);
-                    if (endDate) params.append('endTime', endDate);
                     
                     if (params.toString()) {
                         url += '?' + params.toString();

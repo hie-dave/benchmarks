@@ -5,13 +5,31 @@
             // Use IntelliSense to find out which attributes exist for C# debugging
             // Use hover for the description of the existing attributes
             // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
-            "name": ".NET Core Launch (console)",
+            "name": "Debug (gridded import)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/Dave.Benchmarks.CLI/bin/Debug/net8.0/Dave.Benchmarks.CLI.dll",
-            "args": [],
+            "args": [
+                "gridded",
+                "--climate-dataset",
+                "narclim2_ACCESS-ESM1-5_historical_wrf412r3",
+                "--description", 
+                "Narclim2 continental simulations",
+                "--instruction-file",
+                "/home/drew/code/lpj-guess/.data/runs/narclim2/trunk/full/ACCESS-ESM1-5_historical_NARCliM2-0-WRF412R3/inputs/trunk_ACCESS-ESM1-5_historical_NARCliM2-0-WRF412R3.ins",
+                "--output-dir",
+                "/home/drew/code/lpj-guess/.data/runs/narclim2/trunk/full/ACCESS-ESM1-5_historical_NARCliM2-0-WRF412R3/output/",
+                "--repo-path",
+                "/home/drew/code/lpj-guess/dave2",
+                "--spatial-resolution",
+                "1deg",
+                "--temporal-resolution",
+                "day",
+                "--name",
+                "narclim2_ACCESS-ESM1-5_historical_WRF412R3",
+            ],
             "cwd": "${workspaceFolder}/Dave.Benchmarks.CLI",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",

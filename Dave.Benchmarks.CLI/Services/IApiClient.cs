@@ -21,6 +21,12 @@ public interface IApiClient
         string metadata = "{}");
 
     /// <summary>
+    /// Delete a dataset group and all datasets in the group.
+    /// </summary>
+    /// <param name="groupId">ID of the group to delete.</param>
+    Task DeleteGroupAsync(int groupId);
+
+    /// <summary>
     /// Create a level dataset.
     /// </summary>
     /// <param name="name">Name of the site.</param>
@@ -53,4 +59,27 @@ public interface IApiClient
     /// </summary>
     /// <param name="groupId">ID of the group.</param>
     Task CompleteGroupAsync(int groupId);
+
+    /// <summary>
+    /// Create a new variable in a dataset.
+    /// </summary>
+    /// <param name="datasetId">ID of the dataset to create the variable in.</param>
+    /// <param name="request">The variable creation request.</param>
+    /// <returns>The ID of the created variable.</returns>
+    Task<int> CreateVariableAsync(int datasetId, CreateVariableRequest request);
+
+    /// <summary>
+    /// Create a new layer in a variable.
+    /// </summary>
+    /// <param name="variableId">ID of the variable to create the layer in.</param>
+    /// <param name="request">The layer creation request.</param>
+    /// <returns>The ID of the created layer.</returns>
+    Task<int> CreateLayerAsync(int variableId, CreateLayerRequest request);
+
+    /// <summary>
+    /// Append data points to a layer.
+    /// </summary>
+    /// <param name="layerId">ID of the layer to append data to.</param>
+    /// <param name="request">The data points to append.</param>
+    Task AppendDataAsync(int layerId, AppendDataRequest request);
 }
