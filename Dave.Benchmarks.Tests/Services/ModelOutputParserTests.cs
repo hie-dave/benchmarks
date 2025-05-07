@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Dave.Benchmarks.CLI.Services;
+using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Core.Models.Importer;
 using Microsoft.Extensions.Logging;
 using Moq;

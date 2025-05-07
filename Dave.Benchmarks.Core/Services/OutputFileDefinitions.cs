@@ -1,10 +1,9 @@
 using System.Collections.Immutable;
-using Dave.Benchmarks.CLI.Models;
 using Dave.Benchmarks.Core.Models;
 using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 
-namespace Dave.Benchmarks.CLI.Services;
+namespace Dave.Benchmarks.Core.Services;
 
 /// <summary>
 /// Provides metadata about known output file types

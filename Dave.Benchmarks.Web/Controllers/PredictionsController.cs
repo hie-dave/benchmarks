@@ -134,15 +134,15 @@ public class PredictionsController : ControllerBase
             return BadRequest("Non-individual-level data should not include PFT mappings");
         }
 
-        // Check if variable exists
-        Variable? variable = dataset.Variables
-            .FirstOrDefault(v => v.Name == quantity.Name);
-
         if (!quantity.Layers.Any())
             throw new InvalidOperationException("At least one layer is required");
 
         if (quantity.Layers.GroupBy(l => l.Unit).Count() > 1)
             throw new InvalidOperationException("All layers must have the same unit");
+
+        // Check if variable exists
+        Variable? variable = dataset.Variables
+            .FirstOrDefault(v => v.Name == quantity.Name && v.Level == quantity.Level);
 
         if (variable == null)
         {
@@ -161,16 +161,9 @@ public class PredictionsController : ControllerBase
         }
         else
         {
-            // Validate variable matches
-            if (variable.Units != quantity.Layers.First().Unit.Name)
-                throw new InvalidOperationException(
-                    $"Variable {quantity.Name} already exists with unit " +
-                    $"{variable.Units}, but request has unit {quantity.Layers.First().Unit.Name}");
-
-            if (variable.Level != quantity.Level)
-                throw new InvalidOperationException(
-                    $"Variable {quantity.Name} already exists with level " +
-                    $"{variable.Level}, but request has level {quantity.Level}");
+            // Don't allow duplicates.
+            string message = $"Variable {quantity.Name} already exists";
+            throw new InvalidOperationException(message);
         }
 
         // Create layers and their data points

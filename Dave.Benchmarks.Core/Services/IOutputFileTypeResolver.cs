@@ -1,6 +1,4 @@
-using Dave.Benchmarks.Core.Services;
-
-namespace Dave.Benchmarks.CLI.Services;
+namespace Dave.Benchmarks.Core.Services;
 
 /// <summary>
 /// Resolves output file types from filenames.

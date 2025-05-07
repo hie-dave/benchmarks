@@ -5,13 +5,18 @@
             // Use IntelliSense to find out which attributes exist for C# debugging
             // Use hover for the description of the existing attributes
             // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
+<<<<<<< Updated upstream
             "name": "Debug (gridded import)",
+=======
+            "name": "CLI",
+>>>>>>> Stashed changes
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/Dave.Benchmarks.CLI/bin/Debug/net8.0/Dave.Benchmarks.CLI.dll",
             "args": [
+<<<<<<< Updated upstream
                 "gridded",
                 "--climate-dataset",
                 "narclim2_ACCESS-ESM1-5_historical_wrf412r3",
@@ -29,6 +34,20 @@
                 "day",
                 "--name",
                 "narclim2_ACCESS-ESM1-5_historical_WRF412R3",
+=======
+                "site",
+                "--dry-run",
+                "--repo-path",
+                "/home/drew/code/lpj-guess/dave",
+                "--description",
+                "dave",
+                "--climate-dataset",
+                "ozflux",
+                "--temporal-resolution",
+                "3hour",
+                "--name",
+                "dave"
+>>>>>>> Stashed changes
             ],
             "cwd": "${workspaceFolder}/Dave.Benchmarks.CLI",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console

@@ -1,8 +1,7 @@
 using System.Collections.Immutable;
-using Dave.Benchmarks.Core.Services;
 using Microsoft.Extensions.Logging;
 
-namespace Dave.Benchmarks.CLI.Services;
+namespace Dave.Benchmarks.Core.Services;
 
 /// <summary>
 /// Service for resolving output file types based on instruction file parameters.
@@ -16,8 +15,7 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
     /// Creates a new instance of the OutputFileTypeResolver.
     /// </summary>
     /// <param name="logger">Logger for diagnostic messages.</param>
-    /// <param name="parser">Parser for instruction files.</param>
-    public OutputFileTypeResolver(ILogger<OutputFileTypeResolver> logger, InstructionFileParser parser)
+    public OutputFileTypeResolver(ILogger<OutputFileTypeResolver> logger)
     {
         this.logger = logger;
         filenamesToTypes = ImmutableDictionary<string, string>.Empty;

@@ -9,7 +9,6 @@ using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Core.Utilities;
-using Dave.Benchmarks.Core.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.CLI.Commands;

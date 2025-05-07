@@ -1,4 +1,4 @@
-namespace Dave.Benchmarks.Core.Utils;
+namespace Dave.Benchmarks.Core.Utilities;
 
 public static class TimeUtils
 {

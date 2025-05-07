@@ -1,6 +1,6 @@
 using Dave.Benchmarks.Core.Models.Entities;
 
-namespace Dave.Benchmarks.CLI.Models;
+namespace Dave.Benchmarks.Core.Models;
 
 /// <summary>
 /// Metadata about an output file.

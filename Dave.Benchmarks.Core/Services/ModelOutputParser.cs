@@ -1,15 +1,13 @@
-using Dave.Benchmarks.CLI.Models;
+using Dave.Benchmarks.Core.Models;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Utilities;
+
 using Microsoft.Extensions.Logging;
 
 using TemporalResolution = Dave.Benchmarks.Core.Models.Entities.TemporalResolution;
 using AggregationLevel = Dave.Benchmarks.Core.Models.Entities.AggregationLevel;
 
-using Dave.Benchmarks.Core.Utils;
-using Dave.Benchmarks.Core.Models;
-
-namespace Dave.Benchmarks.CLI.Services;
+namespace Dave.Benchmarks.Core.Services;
 
 /// <summary>
 /// Parser for LPJ-GUESS model output files.

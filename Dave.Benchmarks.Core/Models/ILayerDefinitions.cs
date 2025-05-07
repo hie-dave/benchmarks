@@ -1,6 +1,6 @@
 using Dave.Benchmarks.Core.Models.Importer;
 
-namespace Dave.Benchmarks.CLI.Models;
+namespace Dave.Benchmarks.Core.Models;
 
 /// <summary>
 /// Interface to a class which contains layer metadata for a particular output
