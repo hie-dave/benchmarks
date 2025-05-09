@@ -66,7 +66,9 @@ public static class ModelConstants
     {
         List<string> layers = new() { LonLayer, LatLayer, YearLayer };
         
-        if (resolution == TemporalResolution.Daily)
+        // Allow for a day column in annual outputs, because apparently some
+        // annual outputs like to use that.
+        if (resolution == TemporalResolution.Daily || resolution == TemporalResolution.Annual)
             layers.Add(DayLayer);
 
         switch (level)
