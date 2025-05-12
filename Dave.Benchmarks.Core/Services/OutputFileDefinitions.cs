@@ -73,6 +73,7 @@ public static class OutputFileDefinitions
         AddPftOutput(builder, "file_dave_belowground_cmass", "Below-ground C Mass", "Daily below-ground C biomass", "kgC/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_aboveground_nmass", "Above-ground N Mass", "Daily above-ground N biomass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_belowground_nmass", "Below-ground N Mass", "Daily below-ground N biomass", "kgN/m2", AggregationLevel.Patch, TemporalResolution.Daily);
+        AddPftOutput(builder, "file_dave_aboveground_tree_biomass", "Above-ground Tree Biomass", "Daily Above-ground Tree Biomass (kg/m2)", "kg/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_live_biomass", "Live Biomass", "Daily total live biomass (kg/m2)", "kg/m2", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_indiv_npp", "Individual NPP", "Daily NPP", "gC/m2/day", AggregationLevel.Patch, TemporalResolution.Daily);
         AddPftOutput(builder, "file_dave_sla", "Specific Leaf Area", "Daily specific leaf area", "m2/kgC", AggregationLevel.Patch, TemporalResolution.Daily);
@@ -230,6 +231,7 @@ public static class OutputFileDefinitions
         AddOutput(builder, "file_dave_sompool_nmass", "SOM Pool N Mass", "Daily SOM pool N mass", "kgN/m2", ["nmass"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_ninput", "N Input", "Daily nitrogen input", "kgN/m2/day", ["ninput"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_fpar_ff", "Forest Floor FPAR", "Daily forest floor FPAR", "0-1", ["fpar_ff"], AggregationLevel.Patch, TemporalResolution.Daily);
+        AddOutput(builder, "file_dave_aet", "Evaporation and Transpiration", "Daily patch-level evaporation and transpiration (mm)", "mm", ["evap", "transp"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_resp_heterotrophic", "Heterotrophic Respiration", "Daily heterotrophic respiration", "gC/m2/day", ["resp_h"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_resp", "Total Respiration", "Daily total respiration", "gC/m2/day", ["resp"], AggregationLevel.Patch, TemporalResolution.Daily);
         AddOutput(builder, "file_dave_gpp", "GPP", "Daily gross primary production", "gC/m2/day", ["gpp"], AggregationLevel.Patch, TemporalResolution.Daily);
