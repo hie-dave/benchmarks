@@ -9,7 +9,9 @@ namespace Dave.Benchmarks.Core.Services;
 public class OutputFileTypeResolver : IOutputFileTypeResolver
 {
     private readonly ILogger<OutputFileTypeResolver> logger;
+
     private ImmutableDictionary<string, string> filenamesToTypes;
+    private ImmutableDictionary<string, string> filetypesToNames;
 
     /// <summary>
     /// Creates a new instance of the OutputFileTypeResolver.
@@ -19,6 +21,7 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
     {
         this.logger = logger;
         filenamesToTypes = ImmutableDictionary<string, string>.Empty;
+        filetypesToNames = ImmutableDictionary<string, string>.Empty;
     }
 
     /// <summary>
@@ -35,12 +38,19 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
 
         // Get the actual file names from the instruction file.
         var builder = ImmutableDictionary.CreateBuilder<string, string>();
+        var reverseBuilder = ImmutableDictionary.CreateBuilder<string, string>();
         foreach (string fileType in knownTypes)
+        {
             if (parser.TryGetParameterValue(fileType, out string? filename) && !string.IsNullOrEmpty(filename))
+            {
                 builder.Add(filename, fileType);
+                reverseBuilder.Add(fileType, filename);
+            }
+        }
 
         // Create the lookup table.
         filenamesToTypes = builder.ToImmutable();
+        filetypesToNames = reverseBuilder.ToImmutable();
         logger.LogTrace("Discovered {count} enabled output file types", filenamesToTypes.Count);
     }
 
@@ -55,6 +65,18 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
         if (filenamesToTypes.TryGetValue(filename, out string? fileType))
             return fileType;
         throw new KeyNotFoundException($"Unable to find output file type for filename: {filename}");
+    }
+
+    /// <summary>
+    /// Gets the file name for a given output file type.
+    /// </summary>
+    /// <param name="filetype">The output file type to get the file naem for.</param>
+    /// <returns>The file name if found.</returns>
+    public string GetFileName(string filetype)
+    {
+        if (filetypesToNames.TryGetValue(filetype, out string? filename))
+            return filename;
+        throw new KeyNotFoundException($"Unable to find output file name for file type: {filetype}");
     }
 
     /// <summary>
