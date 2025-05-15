@@ -9,6 +9,8 @@ using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Core.Utilities;
+using LpjGuess.Runner.Parsers;
+using LpjGuess.Runner.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.CLI.Commands;
@@ -21,7 +23,6 @@ public class ImportHandler
     private readonly ILogger<ImportHandler> logger;
     private readonly ModelOutputParser parser;
     private readonly GitService git;
-    private readonly InstructionFileParser insParser;
     private readonly IApiClient apiClient;
     private readonly IOutputFileTypeResolver resolver;
     private readonly GridlistParser gridlistParser;
@@ -60,7 +61,6 @@ public class ImportHandler
         this.logger = logger;
         this.parser = parser;
         git = gitService;
-        insParser = instructionParser;
         this.apiClient = apiClient;
         this.resolver = resolver;
         this.gridlistParser = gridlistParser;
@@ -164,7 +164,7 @@ public class ImportHandler
         RepositoryInfo repoInfo = git.GetRepositoryInfo(options.RepoPath);
 
         // Parse instruction file
-        string parameters = await insParser.ParseInstructionFileAsync(options.InstructionFile);
+        InstructionFileParser parser = InstructionFileParser.FromFile(options.InstructionFile);
 
         // Get all output files and find most recent write time
         string[] outputFiles = Directory.GetFiles(options.OutputDir, "*.out");
@@ -172,7 +172,7 @@ public class ImportHandler
             return;
 
         // Build the lookup table for this site's output files
-        resolver.BuildLookupTable(insParser);
+        resolver.BuildLookupTable(parser);
 
         DateTime mostRecentWriteTime = GetMostRecentWriteTime(outputFiles);
 
@@ -205,7 +205,7 @@ public class ImportHandler
                 }
 
                 // Parse the output file.
-                Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
+                Quantity quantity = await this.parser.ParseOutputFileAsync(outputFile);
 
                 // Add it to the dataset.
                 await apiClient.AddQuantityAsync(datasetId, quantity);
@@ -248,7 +248,7 @@ public class ImportHandler
                 using var __ = logger.BeginScope(siteName);
 
                 // Parse instruction file
-                string parameters = await insParser.ParseInstructionFileAsync(instructionFile);
+                InstructionFileParser insParser = InstructionFileParser.FromFile(instructionFile);
                 string gridlist = insParser.GetGridlist();
                 IEnumerable<Coordinate> coordinates = await gridlistParser.Parse(gridlist);
                 if (coordinates.Count() > 1)

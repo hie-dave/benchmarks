@@ -49,17 +49,6 @@ public static class ModelConstants
     public static readonly string[] MonthCols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Total"];
 
     /// <summary>
-    /// Name of the parameter that specifies the gridlist file.
-    /// </summary>
-    public static string ParamGridlist = "file_gridlist";
-
-    /// <summary>
-    /// Name of the parameter that specifies the gridlist file when using the
-    /// CF input module.
-    /// </summary>
-    public static string ParamGridlistCf = "file_gridlist_cf";
-
-    /// <summary>
     /// Gets the metadata layers for a given aggregation level and temporal resolution.
     /// </summary>
     public static string[] GetMetadataLayers(AggregationLevel level, TemporalResolution resolution)

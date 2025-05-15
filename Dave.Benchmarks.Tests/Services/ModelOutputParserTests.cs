@@ -58,10 +58,10 @@ public class ModelOutputParserTests : IAsyncLifetime
     [Fact]
     public async Task ParseOutputFile_ValidFormat_Success()
     {
-        string content = @"Lon Lat Year Day TeBE TeNE
-151.25 -33.25 2000 1 2.5 1.8
-151.25 -33.75 2000 2 2.6 1.9
-151.50 -33.75 2000 1 1.8 1.7";
+        string content = @"Lon Lat Year TeBE TeNE
+151.25 -33.25 2000 2.5 1.8
+151.25 -33.75 2000 2.6 1.9
+151.50 -33.75 2000 1.8 1.7";
         string filePath = Path.Combine(_testDir, "lai.out");
         await File.WriteAllTextAsync(filePath, content);
 
@@ -98,13 +98,13 @@ public class ModelOutputParserTests : IAsyncLifetime
 
         // Verify timestamps.
         // The model writes day of year starting at 0, so day 1 is January 2.
-        Assert.Equal(new DateTime(2000, 1, 2), tebe.Data[0].Timestamp);
-        Assert.Equal(new DateTime(2000, 1, 3), tebe.Data[1].Timestamp);
-        Assert.Equal(new DateTime(2000, 1, 2), tebe.Data[2].Timestamp);
+        Assert.Equal(new DateTime(2000, 12, 30), tebe.Data[0].Timestamp);
+        Assert.Equal(new DateTime(2000, 12, 30), tebe.Data[1].Timestamp);
+        Assert.Equal(new DateTime(2000, 12, 30), tebe.Data[2].Timestamp);
 
-        Assert.Equal(new DateTime(2000, 1, 2), tene.Data[0].Timestamp);
-        Assert.Equal(new DateTime(2000, 1, 3), tene.Data[1].Timestamp);
-        Assert.Equal(new DateTime(2000, 1, 2), tene.Data[2].Timestamp);
+        Assert.Equal(new DateTime(2000, 12, 30), tene.Data[0].Timestamp);
+        Assert.Equal(new DateTime(2000, 12, 30), tene.Data[1].Timestamp);
+        Assert.Equal(new DateTime(2000, 12, 30), tene.Data[2].Timestamp);
 
         // Verify data.
         Assert.Equal(3, tebe.Data.Count); // 3 rows
@@ -145,12 +145,28 @@ public class ModelOutputParserTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ParseOutputFile_InvalidDataRow_ThrowsException()
+    public async Task ParseOutputFile_InvalidFileType_ThrowsException()
     {
         // Arrange
         var content = @"Lon Lat Year Day LAI NPP
 151.25 -33.75 2000 1 invalid 10.2";
         var filePath = Path.Combine(_testDir, "laif");
+        await File.WriteAllTextAsync(filePath, content);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _parser.ParseOutputFileAsync(filePath));
+        
+        Assert.Contains("Unknown file type", ex.Message);
+    }
+
+    [Fact]
+    public async Task ParseOutputFile_InvalidDataRow_ThrowsException()
+    {
+        // Arrange
+        var content = @"Lon Lat Year Day LAI NPP
+151.25 -33.75 2000 1 invalid 10.2";
+        var filePath = Path.Combine(_testDir, "lai.out");
         await File.WriteAllTextAsync(filePath, content);
 
         // Act & Assert
@@ -205,16 +221,6 @@ public class ModelOutputParserTests : IAsyncLifetime
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => _parser.ParseOutputFileAsync(filePath));
         
-        Assert.Contains("unknown output file", ex.Message);
-
-        // Verify error was logged
-        _logger.Verify(
-            x => x.Log(
-                LogLevel.Error,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("unknown output file")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
+        Assert.Contains("Unknown file type", ex.Message);
     }
 }

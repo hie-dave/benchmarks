@@ -1,5 +1,7 @@
+using LpjGuess.Runner.Parsers;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using LpjGuess.Runner.Models;
 
 namespace Dave.Benchmarks.Core.Services;
 
@@ -41,8 +43,10 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
         var reverseBuilder = ImmutableDictionary.CreateBuilder<string, string>();
         foreach (string fileType in knownTypes)
         {
-            if (parser.TryGetParameterValue(fileType, out string? filename) && !string.IsNullOrEmpty(filename))
+            InstructionParameter? parameter = parser.GetTopLevelParameter(fileType);
+            if (parameter != null)
             {
+                string filename = parameter.AsString();
                 builder.Add(filename, fileType);
                 reverseBuilder.Add(fileType, filename);
             }
