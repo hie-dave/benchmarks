@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 using TemporalResolution = Dave.Benchmarks.Core.Models.Entities.TemporalResolution;
 using AggregationLevel = Dave.Benchmarks.Core.Models.Entities.AggregationLevel;
+using System.Text;
 
 namespace Dave.Benchmarks.Core.Services;
 
@@ -48,6 +49,49 @@ public class ModelOutputParser
             logger.LogError(ex, "Failed to parse output file: {filePath} - {ex.Message}", filePath, ex.Message);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Parse the header row of the specified output file.
+    /// TODO: refactor the main parse method to call this one. At the moment, we
+    /// have duplicated logic.
+    /// </summary>
+    /// <param name="filePath">Path to the file to be read.</param>
+    /// <returns>Collection of layer metadata, if any is found.</returns>
+    public async Task<IEnumerable<LayerMetadata>> ParseOutputFileHeaderAsync(string filePath)
+    {
+        logger.LogDebug("Retrieving output file type");
+        string fileName = Path.GetFileName(filePath);
+        string fileType = resolver.GetFileType(fileName);
+        logger.LogTrace("Output file {fileName} successfully resolved to type: {fileType}", fileName, fileType);
+
+        logger.LogDebug("Retrieving output file metadata");
+        OutputFileMetadata metadata = OutputFileDefinitions.GetMetadata(fileType);
+        logger.LogTrace("Output file metadata successfully retrieved: {description}", metadata.Description);
+
+        logger.LogDebug("Reading output file");
+        string? line = await ReadLineAsync(filePath);
+        if (line == null)
+            ExceptionHelper.Throw<InvalidDataException>(logger, "File must contain at least a header row and one data row");
+        var state = new ParserState(filePath);
+
+        // Parse header row to get column indices.
+        logger.LogDebug("Parsing header row");
+        string[] headers = SplitLine(line);
+        return headers
+            .Where(metadata.Layers.IsDataLayer)
+            .Select(h => new LayerMetadata(h, metadata.Layers.GetUnits(h)));
+    }
+
+    /// <summary>
+    /// Read a single line from the specified file.
+    /// </summary>
+    /// <param name="file">Path to the file.</param>
+    /// <returns>The first line of the file, or null if the file is empty.</returns>
+    private async Task<string?> ReadLineAsync(string file)
+    {
+        using (StreamReader reader = new StreamReader(file))
+            return await reader.ReadLineAsync();
     }
 
     private async Task<Quantity> ParseOutputFileInternalAsync(string filePath)
@@ -163,7 +207,7 @@ public class ModelOutputParser
         }
 
         logger.LogDebug("File parsed successfully");
-    
+
         // Add series to quantity.
         List<Layer> layers = [];
         foreach ((string name, List<DataPoint> points) in seriesData)

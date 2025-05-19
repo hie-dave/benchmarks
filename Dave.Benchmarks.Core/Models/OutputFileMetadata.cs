@@ -8,7 +8,7 @@ namespace Dave.Benchmarks.Core.Models;
 public class OutputFileMetadata
 {
     /// <summary>
-    /// The file name.
+    /// The file type (e.g. "file_lai").
     /// </summary>
     public string FileName { get; init; }
 
