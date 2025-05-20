@@ -68,7 +68,7 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
     {
         if (filenamesToTypes.TryGetValue(filename, out string? fileType))
             return fileType;
-        throw new KeyNotFoundException($"Unable to find output file type for filename: {filename}");
+        throw new KeyNotFoundException($"Unable to find output file type for filename: {filename} (have {filenamesToTypes.Count} registered output file types)");
     }
 
     /// <summary>
@@ -80,7 +80,7 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
     {
         if (filetypesToNames.TryGetValue(filetype, out string? filename))
             return filename;
-        throw new KeyNotFoundException($"Unable to find output file name for file type: {filetype}");
+        throw new KeyNotFoundException($"Unable to find output file name for file type: {filetype} (have {filetypesToNames.Count} registered output file types)");
     }
 
     /// <summary>
