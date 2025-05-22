@@ -69,7 +69,7 @@ public class OutputFileMetadata
     public string GetLongName()
     {
         // Patch-Level Annual LAI.
-        return $"{Level}-Level {TemporalResolution} {Name}";
+        return $"{TemporalResolution} {Level}-Level {Name}";
     }
 
     /// <summary>
@@ -78,6 +78,6 @@ public class OutputFileMetadata
     /// </summary>
     public string GetLongDescription()
     {
-        return $"{Level}-Level {TemporalResolution} {Description}";
+        return $"{TemporalResolution} {Level}-Level {Description}";
     }
 }
