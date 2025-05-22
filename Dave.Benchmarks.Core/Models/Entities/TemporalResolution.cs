@@ -6,6 +6,11 @@ namespace Dave.Benchmarks.Core.Models.Entities;
 public enum TemporalResolution
 {
     /// <summary>
+    /// Subdaily output data, includes Year, Day, and timestep columns.
+    /// </summary>
+    Subdaily,
+
+    /// <summary>
     /// Daily output data, includes Year and Day columns.
     /// </summary>
     Daily,

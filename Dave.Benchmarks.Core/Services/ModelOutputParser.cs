@@ -373,7 +373,7 @@ public class ModelOutputParser
         if (resolution == TemporalResolution.Annual)
             return new DateTime(year, 1, 1).AddDays(364); // Not always end of year!
 
-        if (resolution == TemporalResolution.Daily)
+        if (resolution == TemporalResolution.Daily || resolution == TemporalResolution.Subdaily)
         {
             if (!indices.TryGetValue("Day", out int dayIndex))
                 ExceptionHelper.Throw<InvalidDataException>(logger, "Missing required column: Day");

@@ -57,7 +57,9 @@ public static class ModelConstants
         
         // Allow for a day column in annual outputs, because apparently some
         // annual outputs like to use that.
-        if (resolution == TemporalResolution.Daily || resolution == TemporalResolution.Annual)
+        if (resolution == TemporalResolution.Annual ||
+            resolution == TemporalResolution.Daily ||
+            resolution == TemporalResolution.Subdaily)
             layers.Add(DayLayer);
 
         switch (level)
