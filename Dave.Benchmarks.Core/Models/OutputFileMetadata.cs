@@ -61,4 +61,23 @@ public class OutputFileMetadata
         Level = level;
         TemporalResolution = resolution;
     }
+
+    /// <summary>
+    /// Gets a display name for the output file which includes the aggregation
+    /// level and temporal resolution of the data.
+    /// </summary>
+    public string GetLongName()
+    {
+        // Patch-Level Annual LAI.
+        return $"{Level}-Level {TemporalResolution} {Name}";
+    }
+
+    /// <summary>
+    /// Gets a description for the output file which includes the aggregation
+    /// level and temporal resolution of the data.
+    /// </summary>
+    public string GetLongDescription()
+    {
+        return $"{Level}-Level {TemporalResolution} {Description}";
+    }
 }
