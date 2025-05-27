@@ -13,6 +13,9 @@ using LpjGuess.Runner.Parsers;
 using LpjGuess.Runner.Extensions;
 using Microsoft.Extensions.Logging;
 
+using GridlistParser = Dave.Benchmarks.CLI.Services.GridlistParser;
+using LpjGuess.Runner.Helpers;
+
 namespace Dave.Benchmarks.CLI.Commands;
 
 /// <summary>
@@ -126,7 +129,7 @@ public class ImportHandler
     {
         FileInfo fileInfo = new(filePath);
         TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
-        
+
         return age.TotalSeconds > staleFileThresholdSeconds;
     }
 
@@ -139,7 +142,7 @@ public class ImportHandler
     {
         FileInfo fileInfo = new(filePath);
         TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
-        
+
         logger.LogWarning("Skipping stale output file (age: {age})",
             TimeUtils.FormatTimeSpan(age));
     }
@@ -249,7 +252,8 @@ public class ImportHandler
 
                 // Parse instruction file
                 InstructionFileParser insParser = InstructionFileParser.FromFile(instructionFile);
-                string gridlist = insParser.GetGridlist();
+                InstructionFileHelper helper = new InstructionFileHelper(insParser);
+                string gridlist = helper.GetGridlist();
                 IEnumerable<Coordinate> coordinates = await gridlistParser.Parse(gridlist);
                 if (coordinates.Count() > 1)
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Parser error: site {siteName} has more than one coordinate");
