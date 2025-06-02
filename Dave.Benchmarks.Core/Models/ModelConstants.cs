@@ -44,6 +44,12 @@ public static class ModelConstants
     public const string IndivLayer = "indiv";
 
     /// <summary>
+    /// The PFT layer is a non-data layer provided by cohort-level outputs to
+    /// allow the user to identify the PFT of each cohort.
+    /// </summary>
+    public const string PftLayer = "pft";
+
+    /// <summary>
     /// Name of the columns used in the monthly output files.
     /// </summary>
     public static readonly string[] MonthCols = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Total"];
@@ -75,6 +81,7 @@ public static class ModelConstants
                 layers.Add(StandLayer);
                 layers.Add(PatchLayer);
                 layers.Add(IndivLayer);
+                layers.Add(PftLayer);
                 break;
             case AggregationLevel.Gridcell:
                 // No additional layers needed

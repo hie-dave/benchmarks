@@ -44,7 +44,7 @@ public class StaticLayers : ILayerDefinitions
             throw new InvalidOperationException($"Layer {layer} is not a data layer");
 
         if (!layers.TryGetValue(layer, out var units))
-            throw new InvalidOperationException($"Layer {layer} is not a data layer");
+            throw new InvalidOperationException($"Layer {layer} is not a data layer or a static layer");
 
         return units;
     }
