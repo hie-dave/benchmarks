@@ -33,16 +33,19 @@ public class ModelOutputParser
     /// Parses an output file.
     /// </summary>
     /// <param name="filePath">Path to the output file.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns>A task representing the parse operation.</returns>
-    public async Task<Quantity> ParseOutputFileAsync(string filePath)
+    public async Task<Quantity> ParseOutputFileAsync(
+        string filePath,
+        CancellationToken ct = default)
     {
         logger.LogDebug("Parsing output file: {filePath}", filePath);
 
         try
         {
-            return await ParseOutputFileInternalAsync(filePath);
+            return await ParseOutputFileInternalAsync(filePath, ct);
         }
-        catch (Exception ex) when (ex is not InvalidDataException)
+        catch (Exception ex) when (ex is not InvalidDataException && ex is not TaskCanceledException)
         {
             // Log and rethrow unexpected exceptions
             // InvalidDataException is already logged by ExceptionHelper
@@ -57,8 +60,9 @@ public class ModelOutputParser
     /// have duplicated logic.
     /// </summary>
     /// <param name="filePath">Path to the file to be read.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>Collection of layer metadata, if any is found.</returns>
-    public async Task<IEnumerable<LayerMetadata>> ParseOutputFileHeaderAsync(string filePath)
+    public async Task<IEnumerable<LayerMetadata>> ParseOutputFileHeaderAsync(string filePath, CancellationToken ct)
     {
         logger.LogDebug("Retrieving output file type");
         string fileName = Path.GetFileName(filePath);
@@ -70,7 +74,7 @@ public class ModelOutputParser
         logger.LogTrace("Output file metadata successfully retrieved: {description}", metadata.Description);
 
         logger.LogDebug("Reading output file");
-        string? line = await ReadLineAsync(filePath);
+        string? line = await ReadLineAsync(filePath, ct);
         if (line == null)
             ExceptionHelper.Throw<InvalidDataException>(logger, "File must contain at least a header row and one data row");
         var state = new ParserState(filePath);
@@ -87,14 +91,17 @@ public class ModelOutputParser
     /// Read a single line from the specified file.
     /// </summary>
     /// <param name="file">Path to the file.</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>The first line of the file, or null if the file is empty.</returns>
-    private async Task<string?> ReadLineAsync(string file)
+    private async Task<string?> ReadLineAsync(string file, CancellationToken ct)
     {
         using (StreamReader reader = new StreamReader(file))
-            return await reader.ReadLineAsync();
+            return await reader.ReadLineAsync(ct);
     }
 
-    private async Task<Quantity> ParseOutputFileInternalAsync(string filePath)
+    private async Task<Quantity> ParseOutputFileInternalAsync(
+        string filePath,
+        CancellationToken ct)
     {
         logger.LogDebug("Retrieving output file type");
         string fileName = Path.GetFileName(filePath);
@@ -106,7 +113,7 @@ public class ModelOutputParser
         logger.LogTrace("Output file metadata successfully retrieved: {description}", metadata.Description);
 
         logger.LogDebug("Reading output file");
-        string[] lines = await File.ReadAllLinesAsync(filePath);
+        string[] lines = await File.ReadAllLinesAsync(filePath, ct);
         if (lines.Length < 2)
             ExceptionHelper.Throw<InvalidDataException>(logger, "File must contain at least a header row and one data row");
         var state = new ParserState(filePath);
