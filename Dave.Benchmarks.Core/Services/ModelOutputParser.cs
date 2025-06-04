@@ -144,38 +144,37 @@ public class ModelOutputParser
             // Parse required columns.
             Coordinate point = ParseRequiredColumns(values, indices, metadata);
 
+            // Special handling for PFT column in individual outputs
+            if (metadata.Level == AggregationLevel.Individual && headers.Contains(ModelConstants.PftLayer))
+            {
+                if (point.Individual is null)
+                    ExceptionHelper.Throw<InvalidDataException>(logger, "Individual ID is required for individual-level outputs");
+
+                string pftName = values[indices[ModelConstants.PftLayer]];
+                int indivId = point.Individual!.Value;
+
+                // Check if we've seen this individual before
+                if (state.IndividualPfts.TryGetValue(indivId, out var existing))
+                {
+                    if (existing.PftName != pftName)
+                    {
+                        ExceptionHelper.Throw<InvalidDataException>(logger,
+                            $"Inconsistent PFT mapping in file {Path.GetFileName(state.FilePath)}: " +
+                            $"Individual {indivId} is mapped to '{pftName}' on line {i + 1} " +
+                            $"but was mapped to '{existing.PftName}' on line {existing.LineNumber + 1}");
+                    }
+                }
+                else
+                {
+                    // First time seeing this individual
+                    state.IndividualPfts[indivId] = (pftName, i);
+                }
+            }
+
             // Parse data values for each series.
             logger.LogTrace("Parsing data values");
             foreach (string name in dataColumns)
             {
-                // Special handling for PFT column in individual outputs
-                if (metadata.Level == AggregationLevel.Individual && name.Equals("pft", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (point.Individual is null)
-                        ExceptionHelper.Throw<InvalidDataException>(logger, "Individual ID is required for individual-level outputs");
-
-                    string pftName = values[indices[name]];
-                    int indivId = point.Individual!.Value;
-
-                    // Check if we've seen this individual before
-                    if (state.IndividualPfts.TryGetValue(indivId, out var existing))
-                    {
-                        if (existing.PftName != pftName)
-                        {
-                            ExceptionHelper.Throw<InvalidDataException>(logger,
-                                $"Inconsistent PFT mapping in file {Path.GetFileName(state.FilePath)}: " +
-                                $"Individual {indivId} is mapped to '{pftName}' on line {i + 1} " +
-                                $"but was mapped to '{existing.PftName}' on line {existing.LineNumber + 1}");
-                        }
-                    }
-                    else
-                    {
-                        // First time seeing this individual
-                        state.IndividualPfts[indivId] = (pftName, i);
-                    }
-                    continue;
-                }
-
                 if (!double.TryParse(values[indices[name]], out double value))
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Invalid value: failed to parse double: {values[indices[name]]}");
 

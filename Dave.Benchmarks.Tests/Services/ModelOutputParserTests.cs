@@ -38,6 +38,7 @@ public class ModelOutputParserTests : IAsyncLifetime
                 return name switch
                 {
                     "lai" => "file_lai",
+                    "indiv_lai" => "file_dave_indiv_lai",
                     _ => throw new InvalidOperationException($"Unknown file type: {name}")
                 };
             });
@@ -116,6 +117,33 @@ public class ModelOutputParserTests : IAsyncLifetime
         Assert.Equal(1.8, tene.Data[0].Value, eps);
         Assert.Equal(1.9, tene.Data[1].Value, eps);
         Assert.Equal(1.7, tene.Data[2].Value, eps);
+    }
+
+    [Fact]
+    public async Task ParseIndivOutputFile_Succeeds()
+    {
+        string content = @"Lon      Lat    Year     Day          stand          patch          indiv              pft            lai
+131.15   -12.50    2003       0              0              0             20             TrBE     3.76705464
+131.15   -12.50    2003       1              0              0             20             TrBE     3.76188102
+131.15   -12.50    2003       2              0              0             20             TrBE     3.75671514
+131.15   -12.50    2003       3              0              0             20             TrBE     3.75155710
+131.15   -12.50    2003       4              0              0             20             TrBE     3.74640696
+131.15   -12.50    2003       5              0              0             20             TrBE     3.74126464";
+
+        string filePath = Path.Combine(_testDir, "indiv_lai.out");
+        await File.WriteAllTextAsync(filePath, content);
+
+        Quantity quantity = await _parser.ParseOutputFileAsync(filePath);
+
+        // Check PFT mappings.
+        Assert.NotNull(quantity.IndividualPfts);
+        (int indiv, string pft) = Assert.Single(quantity.IndividualPfts);
+        Assert.Equal("TrBE", pft);
+        Assert.Equal(20, indiv);
+
+        // Check Data.
+        Layer layer = Assert.Single(quantity.Layers);
+        Assert.Equal(6, layer.Data.Count);
     }
 
     [Fact]
