@@ -2,6 +2,7 @@ using LpjGuess.Runner.Parsers;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using LpjGuess.Runner.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Dave.Benchmarks.Core.Services;
 
@@ -69,6 +70,17 @@ public class OutputFileTypeResolver : IOutputFileTypeResolver
         if (filenamesToTypes.TryGetValue(filename, out string? fileType))
             return fileType;
         throw new KeyNotFoundException($"Unable to find output file type for filename: {filename} (have {filenamesToTypes.Count} registered output file types)");
+    }
+
+    /// <summary>
+    /// Try to get a file type corresponding to the specified file name.
+    /// </summary>
+    /// <param name="filename">The file name (e.g. "file_lai").</param>
+    /// <param name="filetype">The corresponding file type, if the instruction file defines one (e.g. "lai.out").</param>
+    /// <returns>The file type corresponding to the file name, if one is defined.</returns>
+    public bool TryGetFileType(string filename, [NotNullWhen(true)] out string? filetype)
+    {
+        return filenamesToTypes.TryGetValue(filename, out filetype);
     }
 
     /// <summary>
