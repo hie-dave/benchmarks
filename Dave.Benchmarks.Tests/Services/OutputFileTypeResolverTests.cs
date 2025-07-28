@@ -1,6 +1,6 @@
 using CommandLine;
 using Dave.Benchmarks.Core.Services;
-using LpjGuess.Runner.Parsers;
+using LpjGuess.Core.Parsers;
 using Microsoft.Extensions.Logging;
 using Moq;
 

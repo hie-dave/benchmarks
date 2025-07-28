@@ -9,12 +9,12 @@ using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Core.Utilities;
-using LpjGuess.Runner.Parsers;
-using LpjGuess.Runner.Extensions;
+using LpjGuess.Core.Parsers;
+using LpjGuess.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 using GridlistParser = Dave.Benchmarks.CLI.Services.GridlistParser;
-using LpjGuess.Runner.Helpers;
+using LpjGuess.Core.Helpers;
 
 namespace Dave.Benchmarks.CLI.Commands;
 

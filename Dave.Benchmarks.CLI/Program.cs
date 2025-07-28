@@ -5,7 +5,7 @@ using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Logging;
 using Dave.Benchmarks.Core.Services;
-using LpjGuess.Runner.Parsers;
+using LpjGuess.Core.Parsers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;

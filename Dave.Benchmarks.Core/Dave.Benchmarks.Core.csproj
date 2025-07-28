@@ -12,7 +12,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
 
-    <ProjectReference Include="../../gui/src/LpjGuess.Runner/LpjGuess.Runner.csproj" />
+    <ProjectReference Include="../../gui/src/LpjGuess.Core/LpjGuess.Core.csproj" />
   </ItemGroup>
 
 </Project>
