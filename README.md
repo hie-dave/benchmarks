@@ -11,13 +11,13 @@ This solution contains the benchmarking tools and web interface for the Dynamics
 
 ## Requirements
 
-- .NET 8.0 SDK and ASP.NET Core Runtime
+- .NET 9.0 SDK and ASP.NET Core Runtime
 - MariaDB/MySQL Server
 - Node.js (for client-side libraries)
 
 ## Development Setup
 
-1. Install the .NET 8.0 SDK and ASP.NET Core Runtime
+1. Install the .NET 9.0 SDK and ASP.NET Core Runtime
 2. Install and configure MariaDB:
 
 Follow distribution-specific instructions for installing MariaDB.
