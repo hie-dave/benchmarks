@@ -9,7 +9,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/Dave.Benchmarks.sln",
+                "${workspaceFolder}/src/Dave.Benchmarks.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -25,7 +25,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/Dave.Benchmarks.sln",
+                "${workspaceFolder}/src/Dave.Benchmarks.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -39,7 +39,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/Dave.Benchmarks.sln"
+                "${workspaceFolder}/src/Dave.Benchmarks.sln"
             ],
             "problemMatcher": "$msCompile"
         }

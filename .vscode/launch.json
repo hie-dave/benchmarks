@@ -10,10 +10,10 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/Dave.Benchmarks.CLI/bin/Debug/net8.0/Dave.Benchmarks.CLI.dll",
+            "program": "${workspaceFolder}/src/Dave.Benchmarks.CLI/bin/Debug/net9.0/Dave.Benchmarks.CLI.dll",
             "args": [
                 "site",
-                "--dry-run",
+                // "--dry-run",
                 "--repo-path",
                 "/home/drew/code/lpj-guess/dave",
                 "--description",
@@ -25,7 +25,7 @@
                 "--name",
                 "dave"
             ],
-            "cwd": "${workspaceFolder}/Dave.Benchmarks.CLI",
+            "cwd": "${workspaceFolder}/src/Dave.Benchmarks.CLI",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false
@@ -39,7 +39,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/Dave.Benchmarks.CLI/bin/Debug/net8.0/Dave.Benchmarks.CLI.dll",
+            "program": "${workspaceFolder}/src/Dave.Benchmarks.CLI/bin/Debug/net9.0/Dave.Benchmarks.CLI.dll",
             "args": [
                 "gridded",
                 "--climate-dataset",
@@ -59,7 +59,7 @@
                 "--name",
                 "narclim2_ACCESS-ESM1-5_historical_WRF412R3",
             ],
-            "cwd": "${workspaceFolder}/Dave.Benchmarks.CLI",
+            "cwd": "${workspaceFolder}/src/Dave.Benchmarks.CLI",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false
