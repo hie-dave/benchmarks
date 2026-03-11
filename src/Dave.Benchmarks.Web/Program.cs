@@ -1,9 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using Dave.Benchmarks.Core.Data;
 using Dave.Benchmarks.Core.Logging;
+using Dave.Benchmarks.Web.Configuration;
 using System.Text.Json.Serialization;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+ConnectionStringsSettings connectionStringsSettings = builder.Configuration
+    .GetSection("ConnectionStrings")
+    .Get<ConnectionStringsSettings>()
+    ?? new ConnectionStringsSettings();
+connectionStringsSettings.Validate();
+string defaultConnection = connectionStringsSettings.DefaultConnection;
 
 // Add services to the container.
 builder.Services.AddControllersWithViews()
@@ -19,8 +27,8 @@ builder.Services.ConfigureLogging();
 // Add database context
 builder.Services.AddDbContext<BenchmarksDbContext>(options =>
     options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection")),
+        defaultConnection,
+        ServerVersion.AutoDetect(defaultConnection),
         mySqlOptions => mySqlOptions
             .EnableRetryOnFailure()
             .MigrationsAssembly("Dave.Benchmarks.Web")
