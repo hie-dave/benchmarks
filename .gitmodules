@@ -1,0 +1,3 @@
+[submodule "ext/gui"]
+	path = ext/gui
+	url = git@github.com:hie-dave/lpjg-gui.git
