@@ -4,6 +4,7 @@ using Dave.Benchmarks.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dave.Benchmarks.Web.Migrations
 {
     [DbContext(typeof(BenchmarksDbContext))]
-    partial class BenchmarksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260311031935_AddEvaluationSchema")]
+    partial class AddEvaluationSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

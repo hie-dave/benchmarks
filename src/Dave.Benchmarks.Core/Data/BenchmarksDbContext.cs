@@ -1,4 +1,5 @@
 using LpjGuess.Core.Models.Entities;
+using Dave.Benchmarks.Core.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dave.Benchmarks.Core.Data;
@@ -23,6 +24,10 @@ public class BenchmarksDbContext : DbContext
     public DbSet<Individual> Individuals { get; set; } = null!;
     public DbSet<IndividualDatum> IndividualData { get; set; } = null!;
     public DbSet<DatasetGroup> DatasetGroups { get; set; } = null!;
+    public DbSet<PredictionBaselineRegistryEntry> PredictionBaselineRegistryEntries { get; set; } = null!;
+    public DbSet<ObservationBaselineRegistryEntry> ObservationBaselineRegistryEntries { get; set; } = null!;
+    public DbSet<EvaluationRun> EvaluationRuns { get; set; } = null!;
+    public DbSet<EvaluationResult> EvaluationResults { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -135,5 +140,112 @@ public class BenchmarksDbContext : DbContext
             .HasIndex(d => d.IndividualId);
         modelBuilder.Entity<IndividualDatum>()
             .HasIndex(d => d.Timestamp);
+
+        modelBuilder.Entity<PredictionBaselineRegistryEntry>(entity =>
+        {
+            entity.Property(e => e.SimulationId)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.Property(e => e.BaselineChannel)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.HasOne(e => e.PredictionDataset)
+                .WithMany()
+                .HasForeignKey(e => e.PredictionDatasetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.SimulationId, e.BaselineChannel })
+                .IsUnique();
+
+            entity.HasIndex(e => e.PredictionDatasetId);
+        });
+
+        modelBuilder.Entity<ObservationBaselineRegistryEntry>(entity =>
+        {
+            entity.Property(e => e.SimulationId)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.Property(e => e.BaselineChannel)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.HasOne(e => e.ObservationDataset)
+                .WithMany()
+                .HasForeignKey(e => e.ObservationDatasetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.SimulationId, e.BaselineChannel })
+                .IsUnique();
+
+            entity.HasIndex(e => e.ObservationDatasetId);
+        });
+
+        modelBuilder.Entity<EvaluationRun>(entity =>
+        {
+            entity.Property(e => e.SimulationId)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.Property(e => e.BaselineChannel)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.Property(e => e.MergeRequestId)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.Property(e => e.SourceBranch)
+                .HasMaxLength(256)
+                .IsRequired();
+
+            entity.Property(e => e.TargetBranch)
+                .HasMaxLength(256)
+                .IsRequired();
+
+            entity.Property(e => e.CommitSha)
+                .HasMaxLength(64)
+                .IsRequired();
+
+            entity.HasOne(e => e.CandidatePredictionDataset)
+                .WithMany()
+                .HasForeignKey(e => e.CandidatePredictionDatasetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.BaselinePredictionDataset)
+                .WithMany()
+                .HasForeignKey(e => e.BaselinePredictionDatasetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.ObservationBaselineDataset)
+                .WithMany()
+                .HasForeignKey(e => e.ObservationBaselineDatasetId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.SimulationId, e.BaselineChannel });
+            entity.HasIndex(e => e.CandidatePredictionDatasetId);
+            entity.HasIndex(e => e.Status);
+        });
+
+        modelBuilder.Entity<EvaluationResult>(entity =>
+        {
+            entity.Property(e => e.VariableName)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.Property(e => e.LayerName)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.HasOne(e => e.EvaluationRun)
+                .WithMany(r => r.Results)
+                .HasForeignKey(e => e.EvaluationRunId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.EvaluationRunId);
+            entity.HasIndex(e => new { e.EvaluationRunId, e.VariableName, e.LayerName });
+        });
     }
 }
