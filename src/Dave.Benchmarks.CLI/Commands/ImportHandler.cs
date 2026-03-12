@@ -198,6 +198,8 @@ public class ImportHandler
                 repoInfo,
                 options.ClimateDataset,
                 options.TemporalResolution,
+                options.SimulationId,
+                options.BaselineChannel,
                 "{}", // TODO: metadata
                 groupId);
 
@@ -290,6 +292,9 @@ public class ImportHandler
                     repoInfo,
                     options.ClimateDataset,
                     options.TemporalResolution,
+                    // Use site name as simulation ID for site-level runs.
+                    siteName,
+                    options.BaselineChannel,
                     "{}", // TODO: metadata
                     groupId);
 

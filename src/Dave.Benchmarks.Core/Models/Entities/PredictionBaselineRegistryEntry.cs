@@ -17,5 +17,11 @@ public class PredictionBaselineRegistryEntry
 
     public DateTime AcceptedAt { get; set; }
 
+    public string AcceptedBy { get; set; } = string.Empty;
+
+    public string? AcceptedReason { get; set; }
+
+    public string? AcceptedFromPipelineId { get; set; }
+
     public Dataset PredictionDataset { get; set; } = null!;
 }

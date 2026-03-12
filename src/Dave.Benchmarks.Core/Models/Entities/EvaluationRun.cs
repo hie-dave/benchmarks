@@ -13,11 +13,9 @@ public class EvaluationRun
 
     public string BaselineChannel { get; set; } = string.Empty;
 
-    public int CandidatePredictionDatasetId { get; set; }
+    public int CandidateDatasetId { get; set; }
 
-    public int? BaselinePredictionDatasetId { get; set; }
-
-    public int? ObservationBaselineDatasetId { get; set; }
+    public int? BaselineDatasetId { get; set; }
 
     public string MergeRequestId { get; set; } = string.Empty;
 
@@ -37,11 +35,9 @@ public class EvaluationRun
 
     public string? ErrorMessage { get; set; }
 
-    public Dataset CandidatePredictionDataset { get; set; } = null!;
+    public PredictionDataset CandidateDataset { get; set; } = null!;
 
-    public Dataset? BaselinePredictionDataset { get; set; }
-
-    public Dataset? ObservationBaselineDataset { get; set; }
+    public PredictionDataset? BaselineDataset { get; set; }
 
     public ICollection<EvaluationResult> Results { get; set; } = new List<EvaluationResult>();
 }

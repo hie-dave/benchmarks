@@ -7,6 +7,7 @@ using LibGit2Sharp;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Moq;
+using System.Net;
 
 namespace Dave.Benchmarks.Tests.Services;
 
@@ -38,33 +39,28 @@ public class GitServiceTests : IAsyncLifetime
     [Fact]
     public void GetRepositoryInfo_ValidRepo_Success()
     {
-        // Arrange
         var repoPath = CreateTestRepository();
         CreateTestFile(repoPath, "test.txt", "initial content");
         CommitAll(repoPath, "Initial commit");
 
-        // Act
         var info = _service.GetRepositoryInfo(repoPath);
 
-        // Assert
         Assert.NotEmpty(info.CommitHash);
         Assert.Equal(repoPath, info.RepositoryPath);
         Assert.False(info.HasUncommittedChanges);
+        Assert.Equal("master", info.BranchName);
     }
 
     [Fact]
     public void GetRepositoryInfo_UncommittedChanges_DetectsChanges()
     {
-        // Arrange
         var repoPath = CreateTestRepository();
         CreateTestFile(repoPath, "test.txt", "initial content");
         CommitAll(repoPath, "Initial commit");
         CreateTestFile(repoPath, "test.txt", "modified content");
 
-        // Act
         var info = _service.GetRepositoryInfo(repoPath);
 
-        // Assert
         Assert.True(info.HasUncommittedChanges);
         Assert.NotEmpty(info.Patches);
     }
@@ -72,7 +68,6 @@ public class GitServiceTests : IAsyncLifetime
     [Fact]
     public void GetRepositoryInfo_DetachedHead_LogsWarning()
     {
-        // Arrange
         var repoPath = CreateTestRepository();
         CreateTestFile(repoPath, "test.txt", "initial content");
         var repo = new Repository(repoPath);
@@ -84,10 +79,8 @@ public class GitServiceTests : IAsyncLifetime
             Commands.Checkout(repo2, commit);
         }
 
-        // Act
         var info = _service.GetRepositoryInfo(repoPath);
 
-        // Assert
         _logger.Verify(
             x => x.Log(
                 Microsoft.Extensions.Logging.LogLevel.Warning,
@@ -96,12 +89,12 @@ public class GitServiceTests : IAsyncLifetime
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+        Assert.Null(info.BranchName);
     }
 
     [Fact]
     public void FindSiteLevelRuns_ValidStructure_FindsRuns()
     {
-        // Arrange
         var repoPath = CreateTestRepository();
         var ozfluxPath = Path.Combine(repoPath, "benchmarks", "ozflux");
         var site1Path = Path.Combine(ozfluxPath, "site1");
@@ -116,10 +109,8 @@ public class GitServiceTests : IAsyncLifetime
         CreateTestFile(site1Path, "run.ins", "param = value");
         CreateTestFile(site2Path, "run.ins", "param = value");
 
-        // Act
         var runs = _service.FindSiteLevelRuns(repoPath).ToList();
 
-        // Assert
         Assert.Equal(2, runs.Count);
         Assert.Contains(runs, r => r.SiteName == "site1");
         Assert.Contains(runs, r => r.SiteName == "site2");
@@ -130,7 +121,7 @@ public class GitServiceTests : IAsyncLifetime
         var repoPath = Path.Combine(_testDir, Guid.NewGuid().ToString());
         Directory.CreateDirectory(repoPath);
         Repository.Init(repoPath);
-        
+
         using var repo = new Repository(repoPath);
         var author = new Signature("test", "test@test.com", DateTimeOffset.Now);
         repo.Config.Set("user.name", "test");

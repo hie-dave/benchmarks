@@ -6,4 +6,5 @@ public class RepositoryInfo
     public byte[] Patches { get; set; } = Array.Empty<byte>();
     public string RepositoryPath { get; set; } = string.Empty;
     public bool HasUncommittedChanges { get; set; }
+    public string? BranchName { get; set; }
 }

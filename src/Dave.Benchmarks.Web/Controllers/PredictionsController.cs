@@ -3,6 +3,7 @@ using LpjGuess.Core.Models.Entities;
 using LpjGuess.Core.Models.Importer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Dave.Benchmarks.Web.Controllers;
 
@@ -81,7 +82,9 @@ public class PredictionsController : ControllerBase
             TemporalResolution = request.TemporalResolution,
             Patches = request.CompressedCodePatches,
             Metadata = request.Metadata,
-            GroupId = request.GroupId
+            GroupId = request.GroupId,
+            SimulationId = request.SimulationId,
+            BaselineChannel = request.BaselineChannel
         };
 
         _dbContext.Datasets.Add(dataset);

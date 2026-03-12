@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Dave.Benchmarks.Core.Data;
 using Dave.Benchmarks.Core.Logging;
+using Dave.Benchmarks.Core.Services.Evaluation;
 using Dave.Benchmarks.Web.Configuration;
+using Dave.Benchmarks.Web.Services.Evaluation;
 using System.Text.Json.Serialization;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -33,6 +35,10 @@ builder.Services.AddDbContext<BenchmarksDbContext>(options =>
             .EnableRetryOnFailure()
             .MigrationsAssembly("Dave.Benchmarks.Web")
     ));
+
+builder.Services.AddScoped<IEvaluationEngine, EvaluationEngine>();
+builder.Services.AddSingleton<IEvaluationJobQueue, EvaluationJobQueue>();
+builder.Services.AddHostedService<EvaluationWorker>();
 
 WebApplication app = builder.Build();
 

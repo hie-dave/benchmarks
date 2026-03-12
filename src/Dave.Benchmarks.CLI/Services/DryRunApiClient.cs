@@ -38,9 +38,16 @@ public class DryRunApiClient : IApiClient
     }
 
     /// <inheritdoc />
-    public Task<int> CreateDatasetAsync(string name, string description, RepositoryInfo repoInfo, string climateDataset, string temporalResolution, string metadata, int? groupId = null)
+    public Task<int> CreateDatasetAsync(string name, string description, RepositoryInfo repoInfo, string climateDataset, string temporalResolution, string simulationId, string baselineChannel, string metadata, int? groupId = null)
     {
-        logger.LogInformation("[DRY RUN] Would create dataset {Name} ({ClimateDataset}, {TemporalResolution}) with description: {Description}", name, climateDataset, temporalResolution, description);
+        logger.LogInformation(
+            "[DRY RUN] Would create dataset {Name} ({ClimateDataset}, {TemporalResolution}, simulation={SimulationId}, channel={BaselineChannel}) with description: {Description}",
+            name,
+            climateDataset,
+            temporalResolution,
+            simulationId,
+            baselineChannel,
+            description);
         return Task.FromResult(1);
     }
 

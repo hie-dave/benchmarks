@@ -34,6 +34,8 @@ public interface IApiClient
     /// <param name="repoInfo">Information about the repository containing the model code.</param>
     /// <param name="climateDataset">Name of the climate dataset.</param>
     /// <param name="temporalResolution">Temporal resolution of the dataset.</param>
+    /// <param name="simulationId">Stable simulation identifier for evaluation baseline scope.</param>
+    /// <param name="baselineChannel">Baseline channel for evaluation baseline scope.</param>
     /// <param name="metadata">Metadata for the dataset, encoded as JSON.</param>
     /// <param name="groupId">ID of the group to which this dataset belongs.</param>
     /// <returns>The ID of the created dataset.</returns>
@@ -43,6 +45,8 @@ public interface IApiClient
         RepositoryInfo repoInfo,
         string climateDataset,
         string temporalResolution,
+        string simulationId,
+        string baselineChannel,
         string metadata,
         int? groupId = null);
 

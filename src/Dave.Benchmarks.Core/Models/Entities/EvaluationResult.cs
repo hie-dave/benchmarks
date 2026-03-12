@@ -1,3 +1,5 @@
+using LpjGuess.Core.Models.Entities;
+
 namespace Dave.Benchmarks.Core.Models.Entities;
 
 /// <summary>
@@ -9,23 +11,31 @@ public class EvaluationResult
 
     public int EvaluationRunId { get; set; }
 
-    public string VariableName { get; set; } = string.Empty;
+    public int CandidateVariableId { get; set; }
 
-    public string LayerName { get; set; } = string.Empty;
+    public int CandidateLayerId { get; set; }
 
-    public int MatchedPointCount { get; set; }
+    public int? BaselineVariableId { get; set; }
 
-    public int NumericMismatchCount { get; set; }
+    public int? BaselineLayerId { get; set; }
 
-    public bool StructuralMismatch { get; set; }
+    public int ObservationVariableId { get; set; }
 
-    public double? R2 { get; set; }
-
-    public double? Rsr { get; set; }
-
-    public double? Nse { get; set; }
-
-    public int? N { get; set; }
+    public int ObservationLayerId { get; set; }
 
     public EvaluationRun EvaluationRun { get; set; } = null!;
+
+    public Variable CandidateVariable { get; set; } = null!;
+
+    public VariableLayer CandidateLayer { get; set; } = null!;
+
+    public Variable? BaselineVariable { get; set; }
+
+    public VariableLayer? BaselineLayer { get; set; }
+
+    public Variable ObservationVariable { get; set; } = null!;
+
+    public VariableLayer ObservationLayer { get; set; } = null!;
+
+    public ICollection<EvaluationMetric> Metrics { get; set; } = new List<EvaluationMetric>();
 }

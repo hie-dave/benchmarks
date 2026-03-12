@@ -66,13 +66,14 @@ public class GitService
         }
 
         // Combine all patches into a single string and convert to bytes
-        var allPatches = string.Join("\n", patches);
+        string allPatches = string.Join("\n", patches);
         return new RepositoryInfo
         {
             CommitHash = commitHash,
             Patches = CompressionUtility.CompressText(allPatches),
             RepositoryPath = repoPath,
-            HasUncommittedChanges = hasUncommittedChanges
+            HasUncommittedChanges = hasUncommittedChanges,
+            BranchName = repo.Info.IsHeadDetached ? null : repo.Head.FriendlyName
         };
     }
 

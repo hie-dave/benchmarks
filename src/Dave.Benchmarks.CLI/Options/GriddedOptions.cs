@@ -15,6 +15,9 @@ public class GriddedOptions : OptionsBase
     [Option('s', "spatial-resolution", Required = true, HelpText = "Spatial resolution of the runs")]
     public string SpatialResolution { get; set; } = string.Empty;
 
+    [Option("simulation-id", Required = true, HelpText = "Stable simulation identifier used for evaluation/baseline scope")]
+    public string SimulationId { get; set; } = string.Empty;
+
     [Usage(ApplicationAlias = "dave-benchmarks")]
     public static IEnumerable<Example> Examples
     {

@@ -182,6 +182,8 @@ public class ProductionApiClient : IApiClient
         RepositoryInfo repoInfo,
         string climateDataset,
         string temporalResolution,
+        string simulationId,
+        string baselineChannel,
         string metadata,
         int? groupId = null)
     {
@@ -192,6 +194,8 @@ public class ProductionApiClient : IApiClient
             ModelVersion = repoInfo.CommitHash,
             ClimateDataset = climateDataset,
             TemporalResolution = temporalResolution,
+            SimulationId = simulationId,
+            BaselineChannel = baselineChannel,
             CompressedCodePatches = repoInfo.Patches,
             Metadata = metadata,
             GroupId = groupId
