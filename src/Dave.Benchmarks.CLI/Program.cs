@@ -30,6 +30,8 @@ builder.Services.AddTransient<CommandRunner>();
 builder.Services.AddTransient<ImportHandler>();
 builder.Services.AddTransient<IGridlistParser, GridlistParser>();
 builder.Services.AddSingleton<IOutputFileTypeResolver, OutputFileTypeResolver>();
+builder.Services.AddSingleton<IFileSystem, PhysicalFileSystem>();
+builder.Services.AddSingleton<IInstructionFileParserFactory, InstructionFileParserFactory>();
 
 // Configure HTTP client and API client
 builder.Services.AddHttpClient<ProductionApiClient>((sp, client) =>

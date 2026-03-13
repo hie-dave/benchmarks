@@ -1,6 +1,7 @@
 using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Services;
+using ExtendedXmlSerializer;
 using LpjGuess.Core.Helpers;
 using LpjGuess.Core.Models;
 using LpjGuess.Core.Models.Entities;
@@ -23,16 +24,7 @@ public class ImportHandler
     private readonly IApiClient apiClient;
     private readonly IOutputFileTypeResolver resolver;
     private readonly IGridlistParser gridlistParser;
-
-    /// <summary>
-    /// Tracks individual-PFT mappings for the current dataset being imported.
-    /// </summary>
-    private IReadOnlyDictionary<int, string>? indivMappings;
-
-    /// <summary>
-    /// The output file from which indivMappings was created.
-    /// </summary>
-    private string? indivMappingsFile;
+    private readonly IFileSystem fileSystem;
 
     /// <summary>
     /// Sites with output files written more than this number of seconds before
@@ -51,6 +43,11 @@ public class ImportHandler
     /// </summary>
     private readonly ILogger<InstructionFileHelper> instructionHelperLogger;
 
+    /// <summary>
+    /// Factory for creating instruction file parsers.
+    /// </summary>
+    private readonly IInstructionFileParserFactory instructionFileParserFactory;
+
     public ImportHandler(
         ILogger<ImportHandler> logger,
         IModelOutputParser parser,
@@ -58,7 +55,9 @@ public class ImportHandler
         IApiClient apiClient,
         IOutputFileTypeResolver resolver,
         IGridlistParser gridlistParser,
-        ILogger<InstructionFileHelper> instructionHelperLogger)
+        ILogger<InstructionFileHelper> instructionHelperLogger,
+        IFileSystem fileSystem,
+        IInstructionFileParserFactory instructionFileParserFactory)
     {
         this.logger = logger;
         this.parser = parser;
@@ -67,44 +66,8 @@ public class ImportHandler
         this.resolver = resolver;
         this.gridlistParser = gridlistParser;
         this.instructionHelperLogger = instructionHelperLogger;
-    }
-
-    private void ValidateIndivPftMappings(Quantity quantity, string fileName)
-    {
-        if (quantity.Level != AggregationLevel.Individual)
-        {
-            if (quantity.IndividualPfts != null)
-                ExceptionHelper.Throw<InvalidDataException>(logger, $"File {fileName} is not an indiv-level output, and should therefore not contain indiv-pft mappings");
-            return;
-        }
-
-        if (indivMappings == null)
-        {
-            // First individual-level file, store the mapping and return.
-            indivMappings = quantity.IndividualPfts;
-            indivMappingsFile = fileName;
-            return;
-        }
-
-        if (quantity.IndividualPfts == null)
-            ExceptionHelper.Throw<InvalidDataException>(logger, $"File {fileName} is an indiv-level output, but does not contain indiv-pft mappings");
-
-        // Compare with existing mapping
-        foreach ((int indivId, string pftName) in quantity.IndividualPfts!)
-        {
-            if (!indivMappings.TryGetValue(indivId, out var existingPft))
-            {
-                throw new InvalidDataException(
-                    $"Inconsistent PFT mapping in {fileName}: " +
-                    $"Individual {indivId} is mapped to '{pftName}' but was previously mapped to '{existingPft}' in file '{indivMappingsFile}'");
-            }
-            if (existingPft != pftName)
-            {
-                throw new InvalidDataException(
-                    $"Inconsistent PFT mapping in {fileName}: " +
-                    $"Individual {indivId} is mapped to '{pftName}' but was previously mapped to '{existingPft}' in file '{indivMappingsFile}'");
-            }
-        }
+        this.fileSystem = fileSystem;
+        this.instructionFileParserFactory = instructionFileParserFactory;
     }
 
     /// <summary>
@@ -114,9 +77,7 @@ public class ImportHandler
     /// <returns>The most recent write time.</returns>
     private DateTime GetMostRecentWriteTime(string[] outputFiles)
     {
-        return outputFiles
-            .Select(f => new FileInfo(f))
-            .Max(f => f.LastWriteTime);
+        return outputFiles.Max(fileSystem.GetLastWriteTime);
     }
 
     /// <summary>
@@ -127,8 +88,8 @@ public class ImportHandler
     /// <returns>True if the file is stale, false otherwise.</returns>
     private bool IsStaleFile(string filePath, DateTime mostRecentWriteTime)
     {
-        FileInfo fileInfo = new(filePath);
-        TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
+        DateTime lastWriteTime = fileSystem.GetLastWriteTime(filePath);
+        TimeSpan age = mostRecentWriteTime - lastWriteTime;
 
         return age.TotalSeconds > staleFileThresholdSeconds;
     }
@@ -140,8 +101,8 @@ public class ImportHandler
     /// <param name="mostRecentWriteTime">The most recent write time.</param>
     private void EmitStaleFileWarning(string filePath, DateTime mostRecentWriteTime)
     {
-        FileInfo fileInfo = new(filePath);
-        TimeSpan age = mostRecentWriteTime - fileInfo.LastWriteTime;
+        DateTime lastWriteTime = fileSystem.GetLastWriteTime(filePath);
+        TimeSpan age = mostRecentWriteTime - lastWriteTime;
 
         logger.LogWarning("Skipping stale output file (age: {age})",
             TimeUtils.FormatTimeSpan(age));
@@ -149,7 +110,8 @@ public class ImportHandler
 
     private string[] EnumerateOutputFiles(string directory)
     {
-        return Directory.GetFiles(directory, "*.out");
+        const SearchOption opts = SearchOption.TopDirectoryOnly;
+        return fileSystem.EnumerateFiles(directory, "*.out", opts).ToArray();
     }
 
     /// <summary>
@@ -159,18 +121,15 @@ public class ImportHandler
     /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task HandleGriddedImport(GriddedOptions options)
     {
-        // Reset dataset-level state
-        indivMappings = null;
-
         // Get repository info
         using var _ = logger.BeginScope("importer");
         RepositoryInfo repoInfo = git.GetRepositoryInfo(options.RepoPath);
 
         // Parse instruction file
-        InstructionFileParser parser = InstructionFileParser.FromFile(options.InstructionFile);
+        IInstructionFileParser parser = instructionFileParserFactory.Create(options.InstructionFile);
 
         // Get all output files and find most recent write time
-        string[] outputFiles = Directory.GetFiles(options.OutputDir, "*.out");
+        string[] outputFiles = EnumerateOutputFiles(options.OutputDir);
         if (outputFiles.Length == 0)
             return;
 
@@ -187,7 +146,6 @@ public class ImportHandler
 
         try
         {
-
             // Create dataset
             int datasetId = await apiClient.CreateDatasetAsync(
                 options.Name,
@@ -253,7 +211,7 @@ public class ImportHandler
                 using var __ = logger.BeginScope(siteName);
 
                 // Parse instruction file
-                InstructionFileParser insParser = InstructionFileParser.FromFile(instructionFile);
+                IInstructionFileParser insParser = instructionFileParserFactory.Create(instructionFile);
                 InstructionFileHelper helper = new InstructionFileHelper(insParser, instructionHelperLogger);
                 string gridlist = helper.GetGridlist();
                 IEnumerable<Gridcell> gridcells = await gridlistParser.ParseAsync(gridlist);
