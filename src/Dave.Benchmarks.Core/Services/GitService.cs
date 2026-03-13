@@ -99,19 +99,4 @@ public class GitService
             }
         }
     }
-
-    private string FindRepositoryPath(string startPath)
-    {
-        var currentDir = new DirectoryInfo(startPath);
-        while (currentDir != null)
-        {
-            var gitDir = Path.Combine(currentDir.FullName, ".git");
-            if (Directory.Exists(gitDir))
-            {
-                return currentDir.FullName;
-            }
-            currentDir = currentDir.Parent;
-        }
-        return string.Empty;
-    }
 }

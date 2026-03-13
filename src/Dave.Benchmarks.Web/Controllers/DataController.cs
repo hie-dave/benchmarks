@@ -329,32 +329,6 @@ public class DataController : Controller
         return Ok(variable.Layers);
     }
 
-    private async Task<int> GetVariableRowCount(int variableId)
-    {
-        var variable = await _dbContext.Variables
-            .FirstOrDefaultAsync(v => v.Id == variableId);
-
-        if (variable == null)
-            return 0;
-
-        return variable.Level switch
-        {
-            AggregationLevel.Gridcell => await _dbContext.GridcellData
-                .Where(d => d.VariableId == variableId)
-                .CountAsync(),
-            AggregationLevel.Stand => await _dbContext.StandData
-                .Where(d => d.VariableId == variableId)
-                .CountAsync(),
-            AggregationLevel.Patch => await _dbContext.PatchData
-                .Where(d => d.VariableId == variableId)
-                .CountAsync(),
-            AggregationLevel.Individual => await _dbContext.IndividualData
-                .Where(d => d.VariableId == variableId)
-                .CountAsync(),
-            _ => 0
-        };
-    }
-
     [HttpDelete("api/data/dataset/{id}")]
     public async Task<ActionResult> DeleteDataset(int id)
     {
@@ -362,16 +336,9 @@ public class DataController : Controller
         if (dataset == null)
             return NotFound();
 
-        try 
-        {
-            _dbContext.Datasets.Remove(dataset);
-            await _dbContext.SaveChangesAsync();
-            return Ok(new { success = true });
-        }
-        catch (Exception ex)
-        {
-            return Ok(new { success = false, message = ex.Message });
-        }
+        _dbContext.Datasets.Remove(dataset);
+        await _dbContext.SaveChangesAsync();
+        return NoContent();
     }
 
     [HttpDelete("api/data/group/{id}")]
@@ -384,18 +351,11 @@ public class DataController : Controller
         if (group == null)
             return NotFound();
 
-        try 
-        {
-            // Note: DB context is not configured for cascade deletion of
-            // related datasets by default, so we need to manually delete them.
-            _dbContext.Datasets.RemoveRange(group.Datasets);
-            _dbContext.DatasetGroups.Remove(group);
-            await _dbContext.SaveChangesAsync();
-            return Ok(new { success = true });
-        }
-        catch (Exception ex)
-        {
-            return Ok(new { success = false, message = ex.Message });
-        }
+        // Note: DB context is not configured for cascade deletion of
+        // related datasets by default, so we need to manually delete them.
+        _dbContext.Datasets.RemoveRange(group.Datasets);
+        _dbContext.DatasetGroups.Remove(group);
+        await _dbContext.SaveChangesAsync();
+        return NoContent();
     }
 }
