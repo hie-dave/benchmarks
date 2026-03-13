@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Dave.Benchmarks.Web.Extensions;
+using Dave.Benchmarks.Core.Models.Entities;
 
 namespace Dave.Benchmarks.Web.Controllers;
 

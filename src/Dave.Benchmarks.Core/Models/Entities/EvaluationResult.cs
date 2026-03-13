@@ -1,5 +1,3 @@
-using LpjGuess.Core.Models.Entities;
-
 namespace Dave.Benchmarks.Core.Models.Entities;
 
 /// <summary>

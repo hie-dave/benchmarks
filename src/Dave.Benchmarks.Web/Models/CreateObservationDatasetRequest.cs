@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Dave.Benchmarks.Core.Models.Entities;
 using LpjGuess.Core.Models.Entities;
 
 namespace Dave.Benchmarks.Web.Models;

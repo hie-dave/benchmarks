@@ -1,11 +1,7 @@
-using System;
-using System.IO;
-using System.Linq;
 using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Tests.Helpers;
 using LibGit2Sharp;
 using Microsoft.Extensions.Logging;
-using Xunit;
 using Moq;
 
 namespace Dave.Benchmarks.Tests.Services;

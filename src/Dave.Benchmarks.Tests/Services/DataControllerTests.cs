@@ -1,4 +1,5 @@
 using Dave.Benchmarks.Core.Data;
+using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Tests.Helpers;
 using Dave.Benchmarks.Web.Controllers;
 using LpjGuess.Core.Models.Entities;

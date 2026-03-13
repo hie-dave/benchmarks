@@ -1,4 +1,4 @@
-using LpjGuess.Core.Models.Entities;
+using Dave.Benchmarks.Core.Models.Entities;
 
 namespace Dave.Benchmarks.Web.Extensions;
 
