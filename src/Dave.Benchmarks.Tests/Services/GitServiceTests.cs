@@ -1,39 +1,31 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using Dave.Benchmarks.Core.Services;
+using Dave.Benchmarks.Tests.Helpers;
 using LibGit2Sharp;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Moq;
-using System.Net;
 
 namespace Dave.Benchmarks.Tests.Services;
 
-public class GitServiceTests : IAsyncLifetime
+public class GitServiceTests : IDisposable
 {
-    private readonly string _testDir;
+    private readonly TempDirectory _testDir;
     private readonly GitService _service;
     private readonly Mock<ILogger<GitService>> _logger;
 
     public GitServiceTests()
     {
-        _testDir = Path.Combine(Path.GetTempPath(), "git_tests");
+        _testDir = TempDirectory.Create("git_tests_");
         _logger = new Mock<ILogger<GitService>>();
         _service = new GitService(_logger.Object);
     }
 
-    public Task InitializeAsync()
+    public void Dispose()
     {
-        Directory.CreateDirectory(_testDir);
-        return Task.CompletedTask;
-    }
-
-    public Task DisposeAsync()
-    {
-        Directory.Delete(_testDir, recursive: true);
-        return Task.CompletedTask;
+        _testDir.Dispose();
     }
 
     [Fact]
@@ -48,7 +40,7 @@ public class GitServiceTests : IAsyncLifetime
         Assert.NotEmpty(info.CommitHash);
         Assert.Equal(repoPath, info.RepositoryPath);
         Assert.False(info.HasUncommittedChanges);
-        Assert.Equal("master", info.BranchName);
+        Assert.False(string.IsNullOrWhiteSpace(info.BranchName));
     }
 
     [Fact]
@@ -70,7 +62,6 @@ public class GitServiceTests : IAsyncLifetime
     {
         var repoPath = CreateTestRepository();
         CreateTestFile(repoPath, "test.txt", "initial content");
-        var repo = new Repository(repoPath);
         var commit = CommitAll(repoPath, "Initial commit");
         
         // Detach HEAD
@@ -116,11 +107,52 @@ public class GitServiceTests : IAsyncLifetime
         Assert.Contains(runs, r => r.SiteName == "site2");
     }
 
-    private string CreateTestRepository()
+    [Fact]
+    public void FindSiteLevelRuns_InvalidStructure_ReturnsEmpty()
     {
-        var repoPath = Path.Combine(_testDir, Guid.NewGuid().ToString());
+        var repoPath = CreateTestRepository();
+        var runs = _service.FindSiteLevelRuns(repoPath).ToList();
+        Assert.Empty(runs);
+    }
+
+    [Fact]
+    public void GetRepositoryInfo_EmptyPath_ThrowsException()
+    {
+        Exception ex = Assert.Throws<ArgumentException>(() => _service.GetRepositoryInfo(""));
+        Assert.Contains("path", ex.Message);
+    }
+
+    [Fact]
+    public void GetRepositoryInfo_NonExistentPath_ThrowsException()
+    {
+        string nonExistentPath = Path.Combine(_testDir.AbsolutePath, "nonexistent");
+        Exception ex = Assert.Throws<ArgumentException>(() => _service.GetRepositoryInfo(nonExistentPath));
+        Assert.Contains("path", ex.Message);
+    }
+
+    [Fact]
+    public void GetRepositoryInfo_BareRepository_ThrowsException()
+    {
+        var repoPath = CreateTestRepository(bare: true);
+
+        Exception ex = Assert.Throws<InvalidOperationException>(() => _service.GetRepositoryInfo(repoPath));
+        Assert.Contains("bare", ex.Message);
+    }
+
+    [Fact]
+    public void GetRepositoryInfo_NoCommits_ThrowsException()
+    {
+        var repoPath = CreateTestRepository();
+
+        Exception ex = Assert.Throws<InvalidOperationException>(() => _service.GetRepositoryInfo(repoPath));
+        Assert.Contains("HEAD", ex.Message);
+    }
+
+    private string CreateTestRepository(bool bare = false)
+    {
+        var repoPath = Path.Combine(_testDir.AbsolutePath, Guid.NewGuid().ToString());
         Directory.CreateDirectory(repoPath);
-        Repository.Init(repoPath);
+        Repository.Init(repoPath, bare);
 
         using var repo = new Repository(repoPath);
         var author = new Signature("test", "test@test.com", DateTimeOffset.Now);

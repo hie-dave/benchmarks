@@ -16,9 +16,9 @@ public class GitService
     public RepositoryInfo GetRepositoryInfo(string repoPath)
     {
         using var _ = _logger.BeginScope("git");
-        if (string.IsNullOrEmpty(repoPath))
+        if (string.IsNullOrEmpty(repoPath) || !Directory.Exists(repoPath))
         {
-            throw new InvalidOperationException($"No git repository found in or above {repoPath}");
+            throw new ArgumentException($"No git repository found in or above path: '{repoPath}'");
         }
 
         using var repo = new Repository(repoPath);
@@ -30,7 +30,7 @@ public class GitService
         }
 
         // Check if HEAD exists and is valid
-        if (repo.Head?.Tip == null)
+        if (repo.Head.Tip == null)
         {
             throw new InvalidOperationException("Repository HEAD is invalid or repository has no commits");
         }
@@ -89,6 +89,7 @@ public class GitService
         {
             var siteName = Path.GetFileName(siteDir);
             var instructionFiles = Directory.GetFiles(siteDir, "*.ins");
+            // TODO: parse top-level instruction file to get output directory.
             var outputDir = Path.Combine(siteDir, "out");
 
             if (instructionFiles.Length > 0 && Directory.Exists(outputDir))

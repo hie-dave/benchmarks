@@ -111,4 +111,43 @@ public class MetricsTests
         Assert.False(BuiltInMetrics.IsKnownType(""));
         Assert.False(BuiltInMetrics.IsKnownType("foo"));
     }
+
+    [Theory]
+    [InlineData("r2", typeof(R2Metric))]
+    [InlineData("nse", typeof(NseMetric))]
+    [InlineData("rsr", typeof(RsrMetric))]
+    [InlineData("n", typeof(CountMetric))]
+    public void BuiltInMetrics_GetByType_ReturnsCorrectMetric(string metricType, Type expectedType)
+    {
+        IMetric metric = BuiltInMetrics.GetByType(metricType);
+        Assert.IsType(expectedType, metric);
+    }
+
+    [Fact]
+    public void BuiltInMetrics_GetByType_UnknownTypeThrows()
+    {
+        Assert.Throws<ArgumentException>(() => BuiltInMetrics.GetByType("unknown"));
+    }
+
+    [Theory]
+    [InlineData("r2")]
+    [InlineData("nse")]
+    [InlineData("rsr")]
+    [InlineData("n")]
+    public void BuiltInMetrics_Description_IsNonEmpty(string metricType)
+    {
+        IMetric metric = BuiltInMetrics.GetByType(metricType);
+        Assert.False(string.IsNullOrWhiteSpace(metric.Description));
+    }
+
+    [Theory]
+    [InlineData("r2")]
+    [InlineData("nse")]
+    [InlineData("rsr")]
+    [InlineData("n")]
+    public void BuiltInMetrics_Name_IsNonEmpty(string metricType)
+    {
+        IMetric metric = BuiltInMetrics.GetByType(metricType);
+        Assert.False(string.IsNullOrWhiteSpace(metric.Name));
+    }
 }

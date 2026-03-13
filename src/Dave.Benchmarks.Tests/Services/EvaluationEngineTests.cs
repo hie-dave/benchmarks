@@ -12,6 +12,19 @@ namespace Dave.Benchmarks.Tests.Services;
 public class EvaluationEngineTests
 {
     [Fact]
+    public async Task ExecuteAsync_WhenRunMissing_ThrowsInvalidOperationException()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        EvaluationEngine engine = new(db, Mock.Of<ILogger<EvaluationEngine>>());
+
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => engine.ExecuteAsync(99999));
+
+        Assert.Contains("not found", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_SuccessPath_UpdatesRunAndPersistsResultsAndMetrics()
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
@@ -202,6 +215,49 @@ public class EvaluationEngineTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ByNameMatching_PairsByTimeAndSortedCoordinateOrder()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+
+        PredictionDataset candidate = EvaluationSeed.CreatePredictionDataset(db, "sim-a", "main");
+        ObservationDataset obs = EvaluationSeed.CreateObservationDataset(
+            db,
+            MatchingStrategy.ByName,
+            simulationId: "sim-a");
+
+        (Variable cVar, VariableLayer cLayer) = EvaluationSeed.AddVariableLayer(db, candidate);
+        (Variable oVar, VariableLayer oLayer) = EvaluationSeed.AddVariableLayer(db, obs);
+
+        DateTime t1 = new(2025, 1, 1);
+        DateTime t2 = new(2025, 1, 2);
+
+        // Candidate has two points at t1, observations have three at t1 and one
+        // at t2. ByName matching should pair in sorted coordinate order and
+        // only up to min count per timestamp.
+        EvaluationSeed.AddGridcellDatum(db, cVar, cLayer, t1, -33, 151, 200.0);
+        EvaluationSeed.AddGridcellDatum(db, cVar, cLayer, t1, -34, 150, 100.0);
+
+        EvaluationSeed.AddGridcellDatum(db, oVar, oLayer, t1, -32, 153, 3.0);
+        EvaluationSeed.AddGridcellDatum(db, oVar, oLayer, t1, -33, 152, 2.0);
+        EvaluationSeed.AddGridcellDatum(db, oVar, oLayer, t1, -34, 149, 1.0);
+        EvaluationSeed.AddGridcellDatum(db, oVar, oLayer, t2, -34, 149, 4.0);
+
+        EvaluationRun run = EvaluationSeed.CreateRun(db, candidate, baselineDatasetId: null);
+        db.ChangeTracker.Clear();
+        EvaluationEngine engine = new(db, Mock.Of<ILogger<EvaluationEngine>>());
+
+        await engine.ExecuteAsync(run.Id);
+
+        EvaluationResult result = db.EvaluationResults
+            .Include(r => r.Metrics)
+            .Single(r => r.EvaluationRunId == run.Id);
+
+        EvaluationMetric count = Assert.Single(result.Metrics, m => m.MetricType == "n");
+        Assert.Equal(2.0, count.Value, 6);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ExactMatch_UsesKeyIntersection()
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
@@ -261,6 +317,83 @@ public class EvaluationEngineTests
             .Include(r => r.Metrics)
             .Single(r => r.EvaluationRunId == run.Id);
         Assert.Contains(result.Metrics, m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InvalidMatchStrategy_CausesFailure()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+
+        // Seed data.
+        PredictionDataset candidate = EvaluationSeed.CreatePredictionDataset(db);
+        ObservationDataset obs = EvaluationSeed.CreateObservationDataset(db, (MatchingStrategy)999);
+        (Variable cVar, VariableLayer cLayer) = EvaluationSeed.AddVariableLayer(db, candidate);
+        (Variable oVar, VariableLayer oLayer) = EvaluationSeed.AddVariableLayer(db, obs);
+        EvaluationRun run = EvaluationSeed.CreateRun(db, candidate, baselineDatasetId: null);
+
+        EvaluationEngine engine = new EvaluationEngine(db, Mock.Of<ILogger<EvaluationEngine>>());
+
+        // Evaluation should fail, but no exception should be thrown.
+        await engine.ExecuteAsync(run.Id);
+
+        // Run should be marked failed with appropriate error message.
+        run = await db.EvaluationRuns.SingleAsync(r => r.Id == run.Id);
+        Assert.Equal(EvaluationRunStatus.Failed, run.Status);
+        Assert.Contains("matching strategy", run.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithBaselineMetricsAndNoImprovement_MarksRunFailed()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+
+        PredictionDataset candidate = EvaluationSeed.CreatePredictionDataset(db, "sim", "main", "cand");
+        PredictionDataset baseline = EvaluationSeed.CreatePredictionDataset(db, "sim", "main", "base");
+        ObservationDataset obs = EvaluationSeed.CreateObservationDataset(db, MatchingStrategy.ExactMatch, active: true);
+
+        (Variable cVar, VariableLayer cLayer) = EvaluationSeed.AddVariableLayer(db, candidate);
+        (Variable bVar, VariableLayer bLayer) = EvaluationSeed.AddVariableLayer(db, baseline);
+        (Variable oVar, VariableLayer oLayer) = EvaluationSeed.AddVariableLayer(db, obs);
+
+        DateTime t = new(2025, 1, 1);
+        EvaluationSeed.AddGridcellDatum(db, cVar, cLayer, t, -33, 151, 1.0);
+        EvaluationSeed.AddGridcellDatum(db, oVar, oLayer, t, -33, 151, 1.0);
+
+        EvaluationRun baselineRun = EvaluationSeed.CreateRun(db, baseline, baselineDatasetId: null);
+        baselineRun.Status = EvaluationRunStatus.Succeeded;
+        baselineRun.Passed = true;
+        db.EvaluationRuns.Update(baselineRun);
+
+        EvaluationResult baselineResult = new()
+        {
+            EvaluationRunId = baselineRun.Id,
+            CandidateVariableId = bVar.Id,
+            CandidateLayerId = bLayer.Id,
+            ObservationVariableId = oVar.Id,
+            ObservationLayerId = oLayer.Id
+        };
+        db.EvaluationResults.Add(baselineResult);
+        db.SaveChanges();
+
+        db.EvaluationMetrics.Add(new EvaluationMetric
+        {
+            EvaluationResultId = baselineResult.Id,
+            MetricType = "n",
+            Value = 2.0
+        });
+        db.SaveChanges();
+
+        EvaluationRun run = EvaluationSeed.CreateRun(db, candidate, baseline.Id);
+        db.ChangeTracker.Clear();
+        EvaluationEngine engine = new(db, Mock.Of<ILogger<EvaluationEngine>>());
+
+        await engine.ExecuteAsync(run.Id);
+
+        EvaluationRun updated = db.EvaluationRuns.Single(r => r.Id == run.Id);
+        Assert.Equal(EvaluationRunStatus.Succeeded, updated.Status);
+        Assert.False(updated.Passed);
     }
 
     [Theory]
