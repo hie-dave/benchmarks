@@ -1,17 +1,14 @@
-using Dave.Benchmarks.CLI.Models;
 using Dave.Benchmarks.CLI.Options;
 using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Services;
-using LpjGuess.Core.Extensions;
 using LpjGuess.Core.Helpers;
+using LpjGuess.Core.Models;
 using LpjGuess.Core.Models.Entities;
 using LpjGuess.Core.Models.Importer;
 using LpjGuess.Core.Parsers;
 using LpjGuess.Core.Services;
 using LpjGuess.Core.Utility;
 using Microsoft.Extensions.Logging;
-
-using GridlistParser = Dave.Benchmarks.CLI.Services.GridlistParser;
 
 namespace Dave.Benchmarks.CLI.Commands;
 
@@ -21,11 +18,11 @@ namespace Dave.Benchmarks.CLI.Commands;
 public class ImportHandler
 {
     private readonly ILogger<ImportHandler> logger;
-    private readonly ModelOutputParser parser;
-    private readonly GitService git;
+    private readonly IModelOutputParser parser;
+    private readonly IGitService git;
     private readonly IApiClient apiClient;
     private readonly IOutputFileTypeResolver resolver;
-    private readonly GridlistParser gridlistParser;
+    private readonly IGridlistParser gridlistParser;
 
     /// <summary>
     /// Tracks individual-PFT mappings for the current dataset being imported.
@@ -56,11 +53,11 @@ public class ImportHandler
 
     public ImportHandler(
         ILogger<ImportHandler> logger,
-        ModelOutputParser parser,
-        GitService gitService,
+        IModelOutputParser parser,
+        IGitService gitService,
         IApiClient apiClient,
         IOutputFileTypeResolver resolver,
-        GridlistParser gridlistParser,
+        IGridlistParser gridlistParser,
         ILogger<InstructionFileHelper> instructionHelperLogger)
     {
         this.logger = logger;
@@ -259,8 +256,8 @@ public class ImportHandler
                 InstructionFileParser insParser = InstructionFileParser.FromFile(instructionFile);
                 InstructionFileHelper helper = new InstructionFileHelper(insParser, instructionHelperLogger);
                 string gridlist = helper.GetGridlist();
-                IEnumerable<Coordinate> coordinates = await gridlistParser.Parse(gridlist);
-                if (coordinates.Count() > 1)
+                IEnumerable<Gridcell> gridcells = await gridlistParser.ParseAsync(gridlist);
+                if (gridcells.Count() > 1)
                     ExceptionHelper.Throw<InvalidDataException>(logger, $"Parser error: site {siteName} has more than one coordinate");
 
                 // Build the lookup table for this site's output files
@@ -284,7 +281,7 @@ public class ImportHandler
                     continue;
                 }
 
-                Coordinate coordinate = coordinates.Single();
+                Gridcell gridcell = gridcells.Single();
                 logger.LogInformation("Creating site-level dataset");
                 int datasetId = await apiClient.CreateDatasetAsync(
                     siteName,

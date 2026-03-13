@@ -23,12 +23,12 @@ builder.Services.AddSingleton(sp =>
 });
 
 // Add core services
-builder.Services.AddTransient<ModelOutputParser>();
-builder.Services.AddTransient<GitService>();
+builder.Services.AddTransient<IModelOutputParser, ModelOutputParser>();
+builder.Services.AddTransient<IGitService, GitService>();
 builder.Services.AddTransient<InstructionFileParser>();
 builder.Services.AddTransient<CommandRunner>();
 builder.Services.AddTransient<ImportHandler>();
-builder.Services.AddTransient<Dave.Benchmarks.CLI.Services.GridlistParser>();
+builder.Services.AddTransient<IGridlistParser, GridlistParser>();
 builder.Services.AddSingleton<IOutputFileTypeResolver, OutputFileTypeResolver>();
 
 // Configure HTTP client and API client

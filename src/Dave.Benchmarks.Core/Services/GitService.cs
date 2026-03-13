@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dave.Benchmarks.Core.Services;
 
-public class GitService
+public class GitService : IGitService
 {
     private readonly ILogger<GitService> _logger;
 
