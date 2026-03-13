@@ -1,3 +1,4 @@
+using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using LpjGuess.Core.Models.Importer;
 using Microsoft.Extensions.Logging;

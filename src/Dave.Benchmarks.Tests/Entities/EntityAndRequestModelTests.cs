@@ -1,5 +1,5 @@
 using Dave.Benchmarks.Core.Models.Entities;
-using LpjGuess.Core.Models.Importer;
+using Dave.Benchmarks.Core.Models.Importer;
 
 namespace Dave.Benchmarks.Tests.Core.Models.Entities;
 

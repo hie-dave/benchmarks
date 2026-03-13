@@ -1,5 +1,6 @@
 using LpjGuess.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
+using Dave.Benchmarks.Core.Models.Importer;
 
 namespace Dave.Benchmarks.CLI.Services;
 
