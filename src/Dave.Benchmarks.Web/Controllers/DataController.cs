@@ -1,6 +1,7 @@
 using Dave.Benchmarks.Core.Data;
 using LpjGuess.Core.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -331,6 +332,7 @@ public class DataController : Controller
     }
 
     [HttpDelete("api/data/dataset/{id}")]
+    [Authorize(Policy = AuthorizationPolicies.GitLabProtectedRef)]
     public async Task<ActionResult> DeleteDataset(int id)
     {
         var dataset = await _dbContext.Datasets.FindAsync(id);
@@ -343,6 +345,7 @@ public class DataController : Controller
     }
 
     [HttpDelete("api/data/group/{id}")]
+    [Authorize(Policy = AuthorizationPolicies.GitLabProtectedRef)]
     public async Task<ActionResult> DeleteGroup(int id)
     {
         var group = await _dbContext.DatasetGroups

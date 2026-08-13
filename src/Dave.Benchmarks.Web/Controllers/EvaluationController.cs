@@ -4,12 +4,14 @@ using Dave.Benchmarks.Web.Models;
 using Dave.Benchmarks.Web.Services.Evaluation;
 using LpjGuess.Core.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dave.Benchmarks.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = AuthorizationPolicies.GitLabCi)]
 public class EvaluationController : ControllerBase
 {
     private readonly BenchmarksDbContext db;
@@ -26,25 +28,27 @@ public class EvaluationController : ControllerBase
         [FromBody] CreateEvaluationRunRequest request,
         CancellationToken cancellationToken)
     {
-        PredictionDataset? candidate = await db.Datasets
-            .OfType<PredictionDataset>()
-            .FirstOrDefaultAsync(d => d.Id == request.CandidateDatasetId, cancellationToken);
-
-        if (candidate == null)
-            return NotFound($"Candidate prediction dataset {request.CandidateDatasetId} not found");
+        BenchmarkSubmission? submission = await db.BenchmarkSubmissions
+            .Include(s => s.Datasets)
+            .FirstOrDefaultAsync(s => s.Id == request.BenchmarkSubmissionId, cancellationToken);
+        if (submission == null) return NotFound($"Submission {request.BenchmarkSubmissionId} not found");
+        string? projectId = HttpContext?.User.FindFirst("project_id")?.Value;
+        if (projectId != null && submission.GitLabProjectId != projectId) return Forbid();
+        if (submission.Status != BenchmarkSubmissionStatus.Complete)
+            return BadRequest("Only complete submissions can be evaluated");
 
         EvaluationRun run = new()
         {
-            CandidateDatasetId = candidate.Id,
-            SimulationId = candidate.SimulationId,
-            BaselineChannel = candidate.BaselineChannel,
-            MergeRequestId = request.MergeRequestId,
-            SourceBranch = request.SourceBranch,
-            TargetBranch = request.TargetBranch,
-            CommitSha = request.CommitSha,
+            BenchmarkSubmissionId = submission.Id,
             Status = EvaluationRunStatus.Pending,
             StartedAt = DateTime.UtcNow
         };
+        foreach (PredictionDataset dataset in submission.Datasets)
+            run.Datasets.Add(new EvaluationRunDataset
+            {
+                CandidateDatasetId = dataset.Id,
+                Status = EvaluationRunStatus.Pending
+            });
 
         db.EvaluationRuns.Add(run);
         await db.SaveChangesAsync(cancellationToken);
@@ -58,8 +62,8 @@ public class EvaluationController : ControllerBase
     public async Task<ActionResult<EvaluationRun>> GetRun(int id, CancellationToken cancellationToken)
     {
         EvaluationRun? run = await db.EvaluationRuns
-            .Include(r => r.Results)
-                .ThenInclude(r => r.Metrics)
+            .Include(r => r.BenchmarkSubmission)
+            .Include(r => r.Datasets).ThenInclude(d => d.Results).ThenInclude(r => r.Metrics)
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
         if (run == null)
@@ -69,6 +73,7 @@ public class EvaluationController : ControllerBase
     }
 
     [HttpPost("accept")]
+    [Authorize(Policy = AuthorizationPolicies.GitLabProtectedRef)]
     public async Task<ActionResult> AcceptBaseline(
         [FromBody] AcceptPredictionBaselineRequest request,
         CancellationToken cancellationToken)

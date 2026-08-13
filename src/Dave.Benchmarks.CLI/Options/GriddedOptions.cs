@@ -4,7 +4,7 @@ using CommandLine.Text;
 namespace Dave.Benchmarks.CLI.Options;
 
 [Verb("gridded", HelpText = "Import gridded model output files")]
-public class GriddedOptions : OptionsBase
+public class GriddedOptions : ImportOptionsBase
 {
     [Option('o', "output-dir", Required = true, HelpText = "Directory containing model outputs")]
     public string OutputDir { get; set; } = string.Empty;

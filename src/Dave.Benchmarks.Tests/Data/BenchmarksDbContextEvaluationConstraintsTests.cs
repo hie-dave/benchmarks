@@ -57,7 +57,7 @@ public class BenchmarksDbContextEvaluationConstraintsTests
 
         EvaluationResult result = new()
         {
-            EvaluationRunId = run.Id,
+            EvaluationRunDatasetId = run.Id,
             CandidateVariableId = cVar.Id,
             CandidateLayerId = cLayer.Id,
             ObservationVariableId = 99999,
@@ -101,7 +101,7 @@ public class BenchmarksDbContextEvaluationConstraintsTests
 
         EvaluationResult result = new()
         {
-            EvaluationRunId = run.Id,
+            EvaluationRunDatasetId = run.Id,
             CandidateVariableId = cVar.Id,
             CandidateLayerId = cLayer.Id,
             ObservationVariableId = obsVarA.Id,
@@ -189,7 +189,7 @@ public class BenchmarksDbContextEvaluationConstraintsTests
 
         EvaluationResult result = new()
         {
-            EvaluationRunId = run.Id,
+            EvaluationRunDatasetId = run.Id,
             CandidateVariableId = cVar.Id,
             CandidateLayerId = cLayer.Id,
             ObservationVariableId = oVar.Id,

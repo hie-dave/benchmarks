@@ -23,6 +23,7 @@ public class EvaluationEngine : IEvaluationEngine
     public async Task ExecuteAsync(int evaluationRunId, CancellationToken cancellationToken = default)
     {
         EvaluationRun? run = await db.EvaluationRuns
+            .Include(r => r.Datasets)
             .FirstOrDefaultAsync(r => r.Id == evaluationRunId, cancellationToken);
 
         if (run == null)
@@ -35,28 +36,33 @@ public class EvaluationEngine : IEvaluationEngine
 
         try
         {
-            PredictionDataset candidate = await db.Datasets
-                .OfType<PredictionDataset>()
-                .Include(d => d.Variables)
-                    .ThenInclude(v => v.Layers)
-                .FirstOrDefaultAsync(d => d.Id == run.CandidateDatasetId, cancellationToken)
-                ?? throw new InvalidOperationException(
-                    $"Candidate prediction dataset {run.CandidateDatasetId} not found");
-
-            PredictionDataset? baseline = await ResolveBaselineDataset(run, candidate, cancellationToken);
-
-            if (baseline != null)
+            bool passed = true;
+            foreach (EvaluationRunDataset runDataset in run.Datasets)
             {
-                run.BaselineDatasetId = baseline.Id;
+                runDataset.Status = EvaluationRunStatus.Running;
+                runDataset.StartedAt = DateTime.UtcNow;
+
+                PredictionDataset candidate = await db.Datasets
+                    .OfType<PredictionDataset>()
+                    .Include(d => d.Variables).ThenInclude(v => v.Layers)
+                    .FirstOrDefaultAsync(d => d.Id == runDataset.CandidateDatasetId, cancellationToken)
+                    ?? throw new InvalidOperationException(
+                        $"Candidate prediction dataset {runDataset.CandidateDatasetId} not found");
+
+                PredictionDataset? baseline = await ResolveBaselineDataset(runDataset, candidate, cancellationToken);
+                if (baseline != null)
+                    runDataset.BaselineDatasetId = baseline.Id;
+
+                Results results = await BuildObservationResults(runDataset, candidate, baseline, cancellationToken);
+                db.EvaluationResults.AddRange(results.EvaluationResults);
+                runDataset.Passed = results.Passed;
+                runDataset.Status = EvaluationRunStatus.Succeeded;
+                runDataset.CompletedAt = DateTime.UtcNow;
+                passed &= results.Passed;
                 await db.SaveChangesAsync(cancellationToken);
             }
 
-            // Build observation-based evaluation result rows with metrics.
-            Results results = await BuildObservationResults(run, candidate, baseline, cancellationToken);
-
-            // Update DB.
-            db.EvaluationResults.AddRange(results.EvaluationResults);
-            run.Passed = results.Passed;
+            run.Passed = passed;
             run.Status = EvaluationRunStatus.Succeeded;
             run.CompletedAt = DateTime.UtcNow;
 
@@ -70,25 +76,33 @@ public class EvaluationEngine : IEvaluationEngine
             run.Passed = false;
             run.CompletedAt = DateTime.UtcNow;
             run.ErrorMessage = ex.Message;
+            foreach (EvaluationRunDataset dataset in run.Datasets.Where(d =>
+                         d.Status is EvaluationRunStatus.Pending or EvaluationRunStatus.Running))
+            {
+                dataset.Status = EvaluationRunStatus.Failed;
+                dataset.Passed = false;
+                dataset.CompletedAt = DateTime.UtcNow;
+                dataset.ErrorMessage = ex.Message;
+            }
             await db.SaveChangesAsync(cancellationToken);
         }
     }
 
     private async Task<PredictionDataset?> ResolveBaselineDataset(
-        EvaluationRun run,
+        EvaluationRunDataset runDataset,
         PredictionDataset candidate,
         CancellationToken cancellationToken)
     {
         PredictionDataset? baseline = null;
-        if (run.BaselineDatasetId.HasValue)
+        if (runDataset.BaselineDatasetId.HasValue)
         {
             return await db.Datasets
                 .OfType<PredictionDataset>()
                 .Include(d => d.Variables)
                     .ThenInclude(v => v.Layers)
-                .FirstOrDefaultAsync(d => d.Id == run.BaselineDatasetId.Value, cancellationToken)
+                .FirstOrDefaultAsync(d => d.Id == runDataset.BaselineDatasetId.Value, cancellationToken)
                 ?? throw new InvalidOperationException(
-                    $"Baseline prediction dataset {run.BaselineDatasetId.Value} not found");
+                    $"Baseline prediction dataset {runDataset.BaselineDatasetId.Value} not found");
         }
 
         PredictionBaselineRegistryEntry? baselineEntry = await db.PredictionBaselineRegistryEntries
@@ -112,7 +126,7 @@ public class EvaluationEngine : IEvaluationEngine
     }
 
     private async Task<Results> BuildObservationResults(
-        EvaluationRun run,
+        EvaluationRunDataset runDataset,
         PredictionDataset candidate,
         PredictionDataset? baseline,
         CancellationToken cancellationToken)
@@ -131,10 +145,9 @@ public class EvaluationEngine : IEvaluationEngine
         if (baseline != null)
         {
             baselineRun = db.EvaluationRuns
-            .Include(r => r.Results)
-            .ThenInclude(r => r.Metrics)
-            .OrderByDescending(r => r.StartedAt)
-            .FirstOrDefault(r => r.CandidateDatasetId == baseline.Id);
+                .Include(r => r.Datasets).ThenInclude(d => d.Results).ThenInclude(r => r.Metrics)
+                .OrderByDescending(r => r.StartedAt)
+                .FirstOrDefault(r => r.Datasets.Any(d => d.CandidateDatasetId == baseline.Id));
         }
 
         foreach (ObservationDataset observationDataset in activeObservations)
@@ -174,7 +187,8 @@ public class EvaluationEngine : IEvaluationEngine
                     VariableLayer? baselineLayer = baselineVar?.Layers
                         .FirstOrDefault(l => l.Name.Equals(candidateLayer.Name, StringComparison.InvariantCultureIgnoreCase));
 
-                    EvaluationResult? baselineResult = baselineRun?.Results
+                    EvaluationResult? baselineResult = baselineRun?.Datasets
+                        .FirstOrDefault(d => d.CandidateDatasetId == baseline.Id)?.Results
                         .FirstOrDefault(r => r.CandidateVariableId == baselineVar?.Id &&
                                     r.CandidateLayerId == baselineLayer?.Id &&
                                     r.ObservationVariableId == observationVar.Id &&
@@ -196,7 +210,7 @@ public class EvaluationEngine : IEvaluationEngine
 
                     EvaluationResult result = new()
                     {
-                        EvaluationRun = run,
+                        EvaluationRunDataset = runDataset,
                         CandidateVariableId = candidateVar.Id,
                         CandidateLayerId = candidateLayer.Id,
                         BaselineVariableId = baselineVar?.Id,

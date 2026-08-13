@@ -4,12 +4,14 @@ using Dave.Benchmarks.Core.Models.Importer;
 using LpjGuess.Core.Models.Entities;
 using LpjGuess.Core.Models.Importer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dave.Benchmarks.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = AuthorizationPolicies.GitLabCi)]
 public class PredictionsController : ControllerBase
 {
     private readonly BenchmarksDbContext _dbContext;
@@ -73,6 +75,19 @@ public class PredictionsController : ControllerBase
                 return BadRequest($"Group {request.GroupId.Value} is marked as complete and cannot accept new datasets");
         }
 
+        if (request.BenchmarkSubmissionId.HasValue)
+        {
+            BenchmarkSubmission? submission = await _dbContext.BenchmarkSubmissions
+                .FirstOrDefaultAsync(s => s.Id == request.BenchmarkSubmissionId.Value);
+            if (submission == null)
+                return NotFound($"Submission {request.BenchmarkSubmissionId.Value} not found");
+            string? projectId = HttpContext?.User.FindFirst("project_id")?.Value;
+            if (projectId != null && submission.GitLabProjectId != projectId)
+                return Forbid();
+            if (submission.Status != BenchmarkSubmissionStatus.Open)
+                return BadRequest($"Submission {submission.Id} is not open");
+        }
+
         var dataset = new PredictionDataset
         {
             Name = request.Name,
@@ -86,6 +101,7 @@ public class PredictionsController : ControllerBase
             GroupId = request.GroupId,
             SimulationId = request.SimulationId,
             BaselineChannel = request.BaselineChannel
+            ,BenchmarkSubmissionId = request.BenchmarkSubmissionId
         };
 
         _dbContext.Datasets.Add(dataset);

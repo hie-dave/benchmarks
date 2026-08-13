@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
+using Dave.Benchmarks.Core.Models.Entities;
 using LpjGuess.Core.Models.Importer;
 using Microsoft.Extensions.Logging;
 
@@ -29,6 +30,8 @@ public class ProductionApiClient : IApiClient
     /// Endpoint of the data API.
     /// </summary>
     private const string dataApi = "api/data";
+
+    private const string evaluationApi = "api/evaluation";
 
     /// <summary>
     /// API endpoint used to create a dataset group.
@@ -186,7 +189,13 @@ public class ProductionApiClient : IApiClient
         string simulationId,
         string baselineChannel,
         string metadata,
-        int? groupId = null)
+        int? groupId = null) => await CreateDatasetAsync(name, description, repoInfo,
+            climateDataset, temporalResolution, simulationId, baselineChannel, metadata, groupId, null);
+
+    public async Task<int> CreateDatasetAsync(
+        string name, string description, RepositoryInfo repoInfo, string climateDataset,
+        string temporalResolution, string simulationId, string baselineChannel,
+        string metadata, int? groupId, int? benchmarkSubmissionId)
     {
         CreateDatasetRequest request = new CreateDatasetRequest()
         {
@@ -200,6 +209,7 @@ public class ProductionApiClient : IApiClient
             CompressedCodePatches = repoInfo.Patches,
             Metadata = metadata,
             GroupId = groupId
+            ,BenchmarkSubmissionId = benchmarkSubmissionId
         };
 
         var response = await PostAsync(createEndpoint, request);
@@ -241,6 +251,70 @@ public class ProductionApiClient : IApiClient
     {
         string endpoint = string.Format(appendDataEndpoint, layerId);
         await PostAsync(endpoint, request);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CreateEvaluationRunAsync(
+        int benchmarkSubmissionId,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new
+        {
+            benchmarkSubmissionId
+        };
+
+        HttpResponseMessage response = await httpClient.PostAsJsonAsync(
+            $"{evaluationApi}/run",
+            request,
+            cancellationToken);
+        await ValidateResponseAsync(response);
+
+        CreateEvaluationRunResponse? result = await response.Content
+            .ReadFromJsonAsync<CreateEvaluationRunResponse>(cancellationToken: cancellationToken);
+        return result?.EvaluationRunId
+            ?? throw new InvalidOperationException("Evaluation API returned no run ID");
+    }
+
+    public async Task<int> CreateBenchmarkSubmissionAsync(
+        string mergeRequestId, string pipelineId, string commitSha, string? commitMessage,
+        string sourceBranch, string targetBranch, string benchmarkName,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new { mergeRequestId, pipelineId, commitSha, commitMessage, sourceBranch, targetBranch, benchmarkName };
+        HttpResponseMessage response = await httpClient.PostAsJsonAsync("api/submissions", request, cancellationToken);
+        await ValidateResponseAsync(response);
+        return await response.Content.ReadFromJsonAsync<int>(cancellationToken: cancellationToken);
+    }
+
+    public async Task CompleteBenchmarkSubmissionAsync(int submissionId, CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response = await httpClient.PostAsync($"api/submissions/{submissionId}/complete", null, cancellationToken);
+        await ValidateResponseAsync(response);
+    }
+
+    public async Task FailBenchmarkSubmissionAsync(int submissionId, string error, CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response = await httpClient.PostAsJsonAsync($"api/submissions/{submissionId}/fail", error, cancellationToken);
+        await ValidateResponseAsync(response);
+    }
+
+    /// <inheritdoc />
+    public async Task<EvaluationRun> GetEvaluationRunAsync(
+        int evaluationRunId,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response = await httpClient.GetAsync(
+            $"{evaluationApi}/runs/{evaluationRunId}",
+            cancellationToken);
+        await ValidateResponseAsync(response);
+
+        return await response.Content.ReadFromJsonAsync<EvaluationRun>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Evaluation API returned an empty response");
+    }
+
+    private sealed class CreateEvaluationRunResponse
+    {
+        public int EvaluationRunId { get; set; }
     }
 
     /// <summary>

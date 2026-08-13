@@ -1,27 +1,13 @@
 namespace Dave.Benchmarks.Core.Models.Entities;
 
 /// <summary>
-/// Stores metadata and status for a single candidate-vs-baseline evaluation run.
+/// Stores status for one aggregate evaluation attempt of a benchmark submission.
 /// </summary>
 public class EvaluationRun
 {
     public int Id { get; set; }
 
-    public string SimulationId { get; set; } = string.Empty;
-
-    public string BaselineChannel { get; set; } = string.Empty;
-
-    public int CandidateDatasetId { get; set; }
-
-    public int? BaselineDatasetId { get; set; }
-
-    public string MergeRequestId { get; set; } = string.Empty;
-
-    public string SourceBranch { get; set; } = string.Empty;
-
-    public string TargetBranch { get; set; } = string.Empty;
-
-    public string CommitSha { get; set; } = string.Empty;
+    public int BenchmarkSubmissionId { get; set; }
 
     public EvaluationRunStatus Status { get; set; }
 
@@ -33,9 +19,6 @@ public class EvaluationRun
 
     public string? ErrorMessage { get; set; }
 
-    public PredictionDataset CandidateDataset { get; set; } = null!;
-
-    public PredictionDataset? BaselineDataset { get; set; }
-
-    public ICollection<EvaluationResult> Results { get; set; } = new List<EvaluationResult>();
+    public BenchmarkSubmission BenchmarkSubmission { get; set; } = null!;
+    public ICollection<EvaluationRunDataset> Datasets { get; set; } = new List<EvaluationRunDataset>();
 }

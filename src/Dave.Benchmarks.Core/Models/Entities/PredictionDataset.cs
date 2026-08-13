@@ -8,6 +8,9 @@ namespace Dave.Benchmarks.Core.Models.Entities;
 /// </summary>
 public class PredictionDataset : Dataset
 {
+    public int? BenchmarkSubmissionId { get; set; }
+    public BenchmarkSubmission? BenchmarkSubmission { get; set; }
+
     /// <summary>
     /// The version/commit of the model used to generate this prediction.
     /// </summary>

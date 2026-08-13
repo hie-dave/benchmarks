@@ -16,6 +16,11 @@ public class CommandRunnerTests
         }
     }
 
+    private sealed class GateHandler
+    {
+        public Task Fail() => throw new EvaluationGateFailedException(12);
+    }
+
     [Fact]
     public async Task RunAsync_Success_ReturnsZero()
     {
@@ -44,5 +49,14 @@ public class CommandRunnerTests
         int result = await runner.RunAsync<TestHandler>(_ => throw new InvalidOperationException("boom"));
 
         Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public async Task RunAsync_GateFails_ReturnsTwo()
+    {
+        ServiceProvider provider = new ServiceCollection().AddSingleton<GateHandler>().BuildServiceProvider();
+        CommandRunner runner = new(provider, NullLogger<CommandRunner>.Instance);
+
+        Assert.Equal(2, await runner.RunAsync<GateHandler>(handler => handler.Fail()));
     }
 }

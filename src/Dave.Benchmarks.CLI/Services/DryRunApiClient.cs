@@ -1,4 +1,5 @@
 using Dave.Benchmarks.Core.Models.Importer;
+using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Services;
 using LpjGuess.Core.Models.Importer;
 using Microsoft.Extensions.Logging;
@@ -39,7 +40,10 @@ public class DryRunApiClient : IApiClient
     }
 
     /// <inheritdoc />
-    public Task<int> CreateDatasetAsync(string name, string description, RepositoryInfo repoInfo, string climateDataset, string temporalResolution, string simulationId, string baselineChannel, string metadata, int? groupId = null)
+    public Task<int> CreateDatasetAsync(string name, string description, RepositoryInfo repoInfo, string climateDataset, string temporalResolution, string simulationId, string baselineChannel, string metadata, int? groupId = null) =>
+        CreateDatasetAsync(name, description, repoInfo, climateDataset, temporalResolution, simulationId, baselineChannel, metadata, groupId, null);
+
+    public Task<int> CreateDatasetAsync(string name, string description, RepositoryInfo repoInfo, string climateDataset, string temporalResolution, string simulationId, string baselineChannel, string metadata, int? groupId, int? benchmarkSubmissionId)
     {
         logger.LogInformation(
             "[DRY RUN] Would create dataset {Name} ({ClimateDataset}, {TemporalResolution}, simulation={SimulationId}, channel={BaselineChannel}) with description: {Description}",
@@ -96,4 +100,24 @@ public class DryRunApiClient : IApiClient
 
         return Task.CompletedTask;
     }
+
+    public Task<int> CreateEvaluationRunAsync(
+        int benchmarkSubmissionId,
+        CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation(
+            "[DRY RUN] Would evaluate dataset {DatasetId} for merge request {MergeRequestId}",
+            benchmarkSubmissionId,
+            "dry-run");
+        return Task.FromResult(-1);
+    }
+
+    public Task<int> CreateBenchmarkSubmissionAsync(string mergeRequestId, string pipelineId, string commitSha, string? commitMessage, string sourceBranch, string targetBranch, string benchmarkName, CancellationToken cancellationToken = default) => Task.FromResult(-1);
+    public Task CompleteBenchmarkSubmissionAsync(int submissionId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task FailBenchmarkSubmissionAsync(int submissionId, string error, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<EvaluationRun> GetEvaluationRunAsync(
+        int evaluationRunId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Dry-run evaluation polling is not supported");
 }

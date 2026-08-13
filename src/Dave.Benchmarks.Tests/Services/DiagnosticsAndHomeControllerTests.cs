@@ -83,6 +83,21 @@ public class DiagnosticsAndHomeControllerTests
     }
 
     [Fact]
+    public async Task TestDatabase_WhenOpenThrows_ReturnsUnknownVersion()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        TestableDiagnosticsController controller = new(
+            db,
+            canConnectAsync: () => Task.FromResult(true),
+            getDbConnection: () => new ThrowingOpenDbConnection());
+
+        IActionResult result = await controller.TestDatabase();
+        JsonResult json = Assert.IsType<JsonResult>(result);
+        Assert.Equal("unknown", ReadStringProperty(json.Value!, "version"));
+    }
+
+    [Fact]
     public async Task TestDatabase_WhenContextDisposed_ReturnsErrorJson()
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
@@ -157,7 +172,7 @@ public class DiagnosticsAndHomeControllerTests
         protected override DbConnection GetDbConnection() => getDbConnection();
     }
 
-    private sealed class FakeDbConnection : DbConnection
+    private class FakeDbConnection : DbConnection
     {
         private ConnectionState state;
         private readonly string serverVersion;
@@ -205,5 +220,18 @@ public class DiagnosticsAndHomeControllerTests
         protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
 
         protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+
+    private sealed class ThrowingOpenDbConnection : FakeDbConnection
+    {
+        public ThrowingOpenDbConnection()
+            : base(ConnectionState.Closed, typeof(ThrowingOpenDbConnection).Name)
+        {
+        }
+
+        public override void Open()
+        {
+            throw new InvalidOperationException("boom");
+        }
     }
 }

@@ -57,7 +57,7 @@ public class EvaluationEngineTests
 
         EvaluationResult result = db.EvaluationResults
             .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunId == run.Id);
+            .Single(r => r.EvaluationRunDatasetId == run.Id);
         Assert.Equal(cVar.Id, result.CandidateVariableId);
         Assert.Equal(cLayer.Id, result.CandidateLayerId);
         Assert.Equal(oVar.Id, result.ObservationVariableId);
@@ -141,7 +141,7 @@ public class EvaluationEngineTests
         await engine.ExecuteAsync(run.Id);
 
         EvaluationRun updated = db.EvaluationRuns.Single(r => r.Id == run.Id);
-        Assert.Equal(newerBaseline.Id, updated.BaselineDatasetId);
+        Assert.Equal(newerBaseline.Id, updated.Datasets.Single().BaselineDatasetId);
         Assert.Equal(EvaluationRunStatus.Succeeded, updated.Status);
     }
 
@@ -180,7 +180,7 @@ public class EvaluationEngineTests
         await engine.ExecuteAsync(run.Id);
 
         EvaluationRun updated = db.EvaluationRuns.Single(r => r.Id == run.Id);
-        Assert.Equal(explicitBaseline.Id, updated.BaselineDatasetId);
+        Assert.Equal(explicitBaseline.Id, updated.Datasets.Single().BaselineDatasetId);
         Assert.True(updated.Passed);
     }
 
@@ -211,7 +211,7 @@ public class EvaluationEngineTests
 
         await engine.ExecuteAsync(run.Id);
 
-        Assert.Empty(db.EvaluationResults.Where(r => r.EvaluationRunId == run.Id));
+        Assert.Empty(db.EvaluationResults.Where(r => r.EvaluationRunDatasetId == run.Id));
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class EvaluationEngineTests
 
         EvaluationResult result = db.EvaluationResults
             .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunId == run.Id);
+            .Single(r => r.EvaluationRunDatasetId == run.Id);
 
         EvaluationMetric count = Assert.Single(result.Metrics, m => m.MetricType == "n");
         Assert.Equal(2.0, count.Value, 6);
@@ -285,7 +285,7 @@ public class EvaluationEngineTests
 
         EvaluationResult result = db.EvaluationResults
             .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunId == run.Id);
+            .Single(r => r.EvaluationRunDatasetId == run.Id);
         Assert.Contains(result.Metrics, m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
     }
 
@@ -315,7 +315,7 @@ public class EvaluationEngineTests
 
         EvaluationResult result = db.EvaluationResults
             .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunId == run.Id);
+            .Single(r => r.EvaluationRunDatasetId == run.Id);
         Assert.Contains(result.Metrics, m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
     }
 
@@ -368,7 +368,7 @@ public class EvaluationEngineTests
 
         EvaluationResult baselineResult = new()
         {
-            EvaluationRunId = baselineRun.Id,
+            EvaluationRunDatasetId = baselineRun.Id,
             CandidateVariableId = bVar.Id,
             CandidateLayerId = bLayer.Id,
             ObservationVariableId = oVar.Id,
@@ -424,7 +424,7 @@ public class EvaluationEngineTests
 
         EvaluationResult result = db.EvaluationResults
             .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunId == run.Id);
+            .Single(r => r.EvaluationRunDatasetId == run.Id);
         Assert.Contains(result.Metrics, m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
     }
 
@@ -458,7 +458,7 @@ public class EvaluationEngineTests
 
         EvaluationResult result = db.EvaluationResults
             .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunId == run.Id);
+            .Single(r => r.EvaluationRunDatasetId == run.Id);
         Assert.Contains(result.Metrics, m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
     }
 

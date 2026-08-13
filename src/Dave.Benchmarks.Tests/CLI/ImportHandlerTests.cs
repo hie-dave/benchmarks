@@ -171,7 +171,8 @@ public class ImportHandlerTests
             Name = "grid-import",
             Description = "desc",
             ClimateDataset = "clim",
-            TemporalResolution = "daily"
+            TemporalResolution = "daily",
+            CleanupOnFailure = true
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleGriddedImport(options));
@@ -495,7 +496,8 @@ public class ImportHandlerTests
             Name = "site-import",
             Description = "desc",
             ClimateDataset = "clim",
-            TemporalResolution = "daily"
+            TemporalResolution = "daily",
+            CleanupOnFailure = true
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleSiteImport(options));

@@ -1,6 +1,7 @@
 using LpjGuess.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
 using Dave.Benchmarks.Core.Models.Importer;
+using Dave.Benchmarks.Core.Models.Entities;
 
 namespace Dave.Benchmarks.CLI.Services;
 
@@ -51,6 +52,12 @@ public interface IApiClient
         string metadata,
         int? groupId = null);
 
+    Task<int> CreateDatasetAsync(
+        string name, string description, RepositoryInfo repoInfo,
+        string climateDataset, string temporalResolution, string simulationId,
+        string baselineChannel, string metadata, int? groupId,
+        int? benchmarkSubmissionId);
+
     /// <summary>
     /// Add a quantity to a dataset.
     /// </summary>
@@ -87,4 +94,25 @@ public interface IApiClient
     /// <param name="layerId">ID of the layer to append data to.</param>
     /// <param name="request">The data points to append.</param>
     Task AppendDataAsync(int layerId, AppendDataRequest request);
+
+    /// <summary>
+    /// Create an asynchronous evaluation run for an imported prediction dataset.
+    /// </summary>
+    Task<int> CreateEvaluationRunAsync(
+        int benchmarkSubmissionId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieve the current state and results of an evaluation run.
+    /// </summary>
+    Task<EvaluationRun> GetEvaluationRunAsync(
+        int evaluationRunId,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CreateBenchmarkSubmissionAsync(
+        string mergeRequestId, string pipelineId, string commitSha, string? commitMessage,
+        string sourceBranch, string targetBranch, string benchmarkName,
+        CancellationToken cancellationToken = default);
+    Task CompleteBenchmarkSubmissionAsync(int submissionId, CancellationToken cancellationToken = default);
+    Task FailBenchmarkSubmissionAsync(int submissionId, string error, CancellationToken cancellationToken = default);
 }

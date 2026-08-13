@@ -7,7 +7,7 @@ public class EvaluationResult
 {
     public int Id { get; set; }
 
-    public int EvaluationRunId { get; set; }
+    public int EvaluationRunDatasetId { get; set; }
 
     public int CandidateVariableId { get; set; }
 
@@ -21,7 +21,7 @@ public class EvaluationResult
 
     public int ObservationLayerId { get; set; }
 
-    public EvaluationRun EvaluationRun { get; set; } = null!;
+    public EvaluationRunDataset EvaluationRunDataset { get; set; } = null!;
 
     public Variable CandidateVariable { get; set; } = null!;
 

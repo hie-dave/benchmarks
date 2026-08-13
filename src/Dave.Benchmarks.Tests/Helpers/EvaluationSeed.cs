@@ -170,19 +170,33 @@ public static class EvaluationSeed
         PredictionDataset candidate,
         int? baselineDatasetId = null)
     {
-        EvaluationRun run = new()
+        BenchmarkSubmission submission = new()
         {
-            CandidateDatasetId = candidate.Id,
-            BaselineDatasetId = baselineDatasetId,
-            SimulationId = candidate.SimulationId,
-            BaselineChannel = candidate.BaselineChannel,
+            GitLabProjectId = "1",
             MergeRequestId = "123",
+            PipelineId = Guid.NewGuid().ToString(),
             SourceBranch = "feature",
             TargetBranch = "main",
             CommitSha = "abcdef",
+            BenchmarkName = "test",
+            Status = BenchmarkSubmissionStatus.Complete,
+            CreatedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow
+        };
+        db.BenchmarkSubmissions.Add(submission);
+        db.SaveChanges();
+        EvaluationRun run = new()
+        {
+            BenchmarkSubmissionId = submission.Id,
             Status = EvaluationRunStatus.Pending,
             StartedAt = DateTime.UtcNow
         };
+        run.Datasets.Add(new EvaluationRunDataset
+        {
+            CandidateDatasetId = candidate.Id,
+            BaselineDatasetId = baselineDatasetId,
+            Status = EvaluationRunStatus.Pending
+        });
         db.EvaluationRuns.Add(run);
         db.SaveChanges();
         return run;

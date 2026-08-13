@@ -4,7 +4,7 @@ using CommandLine.Text;
 namespace Dave.Benchmarks.CLI.Options;
 
 [Verb("site", HelpText = "Import site-level model output files")]
-public class SiteOptions : OptionsBase
+public class SiteOptions : ImportOptionsBase
 {
     [Usage(ApplicationAlias = "dave-benchmarks")]
     public static IEnumerable<Example> Examples

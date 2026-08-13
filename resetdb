@@ -9,6 +9,7 @@
 set -euo pipefail
 
 SQL_FILE="$(mktemp)"
+trap 'rm -f "${SQL_FILE}"' EXIT
 
 # First, get the list of tables and generate DROP statements
 mariadb -u dave -D dave_benchmarks -N -e "
@@ -21,5 +22,3 @@ mariadb -u dave -D dave_benchmarks -e "
 SET FOREIGN_KEY_CHECKS = 0;
 source ${SQL_FILE}
 SET FOREIGN_KEY_CHECKS = 1;"
-
-rm -f "${SQL_FILE}"

@@ -23,6 +23,11 @@ public class CommandRunner
             await action(handler);
             return 0;
         }
+        catch (EvaluationGateFailedException ex)
+        {
+            _logger.LogError(ex, "Benchmark gate failed");
+            return 2;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Command failed");

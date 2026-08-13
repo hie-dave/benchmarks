@@ -22,11 +22,7 @@ public class EvaluationControllerTests
 
         ActionResult<object> response = await controller.Run(new CreateEvaluationRunRequest
         {
-            CandidateDatasetId = 999,
-            MergeRequestId = "1",
-            SourceBranch = "feature",
-            TargetBranch = "main",
-            CommitSha = "abc"
+            BenchmarkSubmissionId = 999
         }, CancellationToken.None);
 
         Assert.IsType<NotFoundObjectResult>(response.Result);
@@ -38,6 +34,10 @@ public class EvaluationControllerTests
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
         PredictionDataset candidate = EvaluationSeed.CreatePredictionDataset(db, "sim", "chan");
+        BenchmarkSubmission submission = CreateSubmission(db, candidate);
+        PredictionDataset secondCandidate = EvaluationSeed.CreatePredictionDataset(db, "sim-2", "chan");
+        secondCandidate.BenchmarkSubmissionId = submission.Id;
+        db.SaveChanges();
 
         int enqueuedId = -1;
         var queue = new Mock<IEvaluationJobQueue>();
@@ -49,19 +49,17 @@ public class EvaluationControllerTests
 
         ActionResult<object> response = await controller.Run(new CreateEvaluationRunRequest
         {
-            CandidateDatasetId = candidate.Id,
-            MergeRequestId = "2",
-            SourceBranch = "feature/x",
-            TargetBranch = "main",
-            CommitSha = "abcdef"
+            BenchmarkSubmissionId = submission.Id
         }, CancellationToken.None);
 
         OkObjectResult ok = Assert.IsType<OkObjectResult>(response.Result);
         Assert.NotNull(ok.Value);
         EvaluationRun run = db.EvaluationRuns.Single();
         Assert.Equal(EvaluationRunStatus.Pending, run.Status);
-        Assert.Equal(candidate.SimulationId, run.SimulationId);
-        Assert.Equal(candidate.BaselineChannel, run.BaselineChannel);
+        Assert.Equal(submission.Id, run.BenchmarkSubmissionId);
+        Assert.Equal(
+            [candidate.Id, secondCandidate.Id],
+            db.EvaluationRunDatasets.OrderBy(d => d.CandidateDatasetId).Select(d => d.CandidateDatasetId).ToArray());
         Assert.Equal(run.Id, enqueuedId);
     }
 
@@ -90,7 +88,7 @@ public class EvaluationControllerTests
 
         EvaluationResult result = new()
         {
-            EvaluationRunId = run.Id,
+            EvaluationRunDatasetId = run.Datasets.Single().Id,
             CandidateVariableId = cVar.Id,
             CandidateLayerId = cLayer.Id,
             ObservationVariableId = oVar.Id,
@@ -111,8 +109,8 @@ public class EvaluationControllerTests
 
         OkObjectResult ok = Assert.IsType<OkObjectResult>(response.Result);
         EvaluationRun returned = Assert.IsType<EvaluationRun>(ok.Value);
-        Assert.Single(returned.Results);
-        Assert.Single(returned.Results.Single().Metrics);
+        EvaluationRunDataset returnedDataset = Assert.Single(returned.Datasets);
+        Assert.Single(Assert.Single(returnedDataset.Results).Metrics);
     }
 
     [Fact]
@@ -165,5 +163,21 @@ public class EvaluationControllerTests
         Assert.Equal("ci", rows[0].AcceptedBy);
         Assert.Equal("ci", rows[1].AcceptedBy);
         Assert.Equal("101", rows[1].AcceptedFromPipelineId);
+    }
+
+    private static BenchmarkSubmission CreateSubmission(BenchmarksDbContext db, PredictionDataset dataset)
+    {
+        BenchmarkSubmission submission = new()
+        {
+            GitLabProjectId = "1", MergeRequestId = "2", PipelineId = Guid.NewGuid().ToString(),
+            CommitSha = "abcdef", SourceBranch = "feature", TargetBranch = "main",
+            BenchmarkName = "test", Status = BenchmarkSubmissionStatus.Complete,
+            CreatedAt = DateTime.UtcNow, CompletedAt = DateTime.UtcNow
+        };
+        db.BenchmarkSubmissions.Add(submission);
+        db.SaveChanges();
+        dataset.BenchmarkSubmissionId = submission.Id;
+        db.SaveChanges();
+        return submission;
     }
 }

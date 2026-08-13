@@ -29,6 +29,8 @@ public class BenchmarksDbContext : DbContext
     public DbSet<EvaluationRun> EvaluationRuns { get; set; } = null!;
     public DbSet<EvaluationResult> EvaluationResults { get; set; } = null!;
     public DbSet<EvaluationMetric> EvaluationMetrics { get; set; } = null!;
+    public DbSet<BenchmarkSubmission> BenchmarkSubmissions { get; set; } = null!;
+    public DbSet<EvaluationRunDataset> EvaluationRunDatasets { get; set; } = null!;
 
     public override int SaveChanges()
     {
@@ -257,45 +259,47 @@ public class BenchmarksDbContext : DbContext
             entity.HasIndex(e => e.AcceptedAt);
         });
 
+        modelBuilder.Entity<BenchmarkSubmission>(entity =>
+        {
+            entity.Property(e => e.GitLabProjectId).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.MergeRequestId).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.PipelineId).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.CommitSha).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.CommitMessage).HasMaxLength(1024);
+            entity.Property(e => e.SourceBranch).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.TargetBranch).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.BenchmarkName).HasMaxLength(128).IsRequired();
+            entity.HasIndex(e => new { e.GitLabProjectId, e.PipelineId, e.BenchmarkName });
+            entity.HasIndex(e => new { e.GitLabProjectId, e.MergeRequestId, e.CreatedAt });
+            entity.HasIndex(e => new { e.GitLabProjectId, e.CommitSha });
+            entity.HasIndex(e => e.Status);
+        });
+
+        modelBuilder.Entity<PredictionDataset>()
+            .HasOne(d => d.BenchmarkSubmission)
+            .WithMany(s => s.Datasets)
+            .HasForeignKey(d => d.BenchmarkSubmissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<EvaluationRun>(entity =>
         {
-            entity.Property(e => e.SimulationId)
-                .HasMaxLength(128)
-                .IsRequired();
-
-            entity.Property(e => e.BaselineChannel)
-                .HasMaxLength(128)
-                .IsRequired();
-
-            entity.Property(e => e.MergeRequestId)
-                .HasMaxLength(128)
-                .IsRequired();
-
-            entity.Property(e => e.SourceBranch)
-                .HasMaxLength(256)
-                .IsRequired();
-
-            entity.Property(e => e.TargetBranch)
-                .HasMaxLength(256)
-                .IsRequired();
-
-            entity.Property(e => e.CommitSha)
-                .HasMaxLength(64)
-                .IsRequired();
-
-            entity.HasOne(e => e.CandidateDataset)
-                .WithMany()
-                .HasForeignKey(e => e.CandidateDatasetId)
+            entity.HasOne(e => e.BenchmarkSubmission)
+                .WithMany(s => s.EvaluationRuns)
+                .HasForeignKey(e => e.BenchmarkSubmissionId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => e.BenchmarkSubmissionId);
+            entity.HasIndex(e => e.Status);
+        });
 
-            entity.HasOne(e => e.BaselineDataset)
-                .WithMany()
-                .HasForeignKey(e => e.BaselineDatasetId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasIndex(e => new { e.SimulationId, e.BaselineChannel });
-            entity.HasIndex(e => e.CandidateDatasetId);
-            entity.HasIndex(e => e.BaselineDatasetId);
+        modelBuilder.Entity<EvaluationRunDataset>(entity =>
+        {
+            entity.HasOne(e => e.EvaluationRun).WithMany(r => r.Datasets)
+                .HasForeignKey(e => e.EvaluationRunId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.CandidateDataset).WithMany()
+                .HasForeignKey(e => e.CandidateDatasetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.BaselineDataset).WithMany()
+                .HasForeignKey(e => e.BaselineDatasetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.EvaluationRunId, e.CandidateDatasetId }).IsUnique();
             entity.HasIndex(e => e.Status);
         });
 
@@ -306,9 +310,9 @@ public class BenchmarksDbContext : DbContext
                 "((BaselineVariableId IS NULL AND BaselineLayerId IS NULL) OR " +
                 "(BaselineVariableId IS NOT NULL AND BaselineLayerId IS NOT NULL))"));
 
-            entity.HasOne(e => e.EvaluationRun)
+            entity.HasOne(e => e.EvaluationRunDataset)
                 .WithMany(r => r.Results)
-                .HasForeignKey(e => e.EvaluationRunId)
+                .HasForeignKey(e => e.EvaluationRunDatasetId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(e => e.CandidateVariable)
@@ -346,10 +350,10 @@ public class BenchmarksDbContext : DbContext
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasIndex(e => e.EvaluationRunId);
+            entity.HasIndex(e => e.EvaluationRunDatasetId);
             entity.HasIndex(e => new
             {
-                e.EvaluationRunId,
+                e.EvaluationRunDatasetId,
                 e.CandidateVariableId,
                 e.CandidateLayerId,
                 e.ObservationVariableId,

@@ -10,6 +10,7 @@ using LpjGuess.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
@@ -28,6 +29,8 @@ builder.Services.AddTransient<IGitService, GitService>();
 builder.Services.AddTransient<InstructionFileParser>();
 builder.Services.AddTransient<CommandRunner>();
 builder.Services.AddTransient<ImportHandler>();
+builder.Services.AddTransient<EvaluateHandler>();
+builder.Services.AddTransient<BenchmarkHandler>();
 builder.Services.AddTransient<IGridlistParser, GridlistParser>();
 builder.Services.AddSingleton<IOutputFileTypeResolver, OutputFileTypeResolver>();
 builder.Services.AddSingleton<IFileSystem, PhysicalFileSystem>();
@@ -38,6 +41,17 @@ builder.Services.AddHttpClient<ProductionApiClient>((sp, client) =>
 {
     ApiSettings settings = sp.GetRequiredService<ApiSettings>();
     client.BaseAddress = new Uri(settings.WebApiUrl);
+
+    string token = Environment.GetEnvironmentVariable(ApiSettings.TokenEnvironmentVariable)
+        ?? settings.AccessToken;
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        throw new InvalidOperationException(
+            $"API authentication token is missing. Set {ApiSettings.TokenEnvironmentVariable}.");
+    }
+
+    client.DefaultRequestHeaders.Authorization =
+        new AuthenticationHeaderValue("Bearer", token.Trim());
 });
 
 // Configure logging
@@ -57,8 +71,19 @@ async Task<int> Run<THandler, TOptions>(TOptions options, Func<THandler, TOption
     return await runner.RunAsync<THandler>(handler => handlerFunc(handler, options));
 }
 
+async Task<int> RunApiCommand<THandler, TOptions>(TOptions options, Func<THandler, TOptions, Task> action)
+    where THandler : notnull
+{
+    builder.Services.AddTransient<IApiClient, ProductionApiClient>(sp => sp.GetRequiredService<ProductionApiClient>());
+    using IHost host = builder.Build();
+    return await host.Services.GetRequiredService<CommandRunner>()
+        .RunAsync<THandler>(handler => action(handler, options));
+}
+
 // Parse command line
-return await Parser.Default.ParseArguments<GriddedOptions, SiteOptions>(args).MapResult(
+return await Parser.Default.ParseArguments<GriddedOptions, SiteOptions, EvaluateOptions, BenchmarkOptions>(args).MapResult(
         (GriddedOptions opts) => Run(opts, (ImportHandler handler, GriddedOptions opts) => handler.HandleGriddedImport(opts)),
         (SiteOptions opts) => Run(opts, (ImportHandler handler, SiteOptions opts) => handler.HandleSiteImport(opts)),
+        (EvaluateOptions opts) => RunApiCommand(opts, (EvaluateHandler handler, EvaluateOptions opts) => handler.RunAsync(opts)),
+        (BenchmarkOptions opts) => RunApiCommand(opts, (BenchmarkHandler handler, BenchmarkOptions opts) => handler.RunAsync(opts)),
         _ => Task.FromResult(1));

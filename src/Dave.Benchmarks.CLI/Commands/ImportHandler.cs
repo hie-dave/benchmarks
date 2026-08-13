@@ -119,7 +119,7 @@ public class ImportHandler
     /// </summary>
     /// <param name="options">The options for the gridded import.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    public async Task HandleGriddedImport(GriddedOptions options)
+    public async Task<ImportResult> HandleGriddedImport(GriddedOptions options)
     {
         // Get repository info
         using var _ = logger.BeginScope("importer");
@@ -131,7 +131,7 @@ public class ImportHandler
         // Get all output files and find most recent write time
         string[] outputFiles = EnumerateOutputFiles(options.OutputDir);
         if (outputFiles.Length == 0)
-            return;
+            return new ImportResult(0, []);
 
         // Build the lookup table for this site's output files
         resolver.BuildLookupTable(parser);
@@ -147,7 +147,8 @@ public class ImportHandler
         try
         {
             // Create dataset
-            int datasetId = await apiClient.CreateDatasetAsync(
+            int datasetId = options.SubmissionId.HasValue
+                ? await apiClient.CreateDatasetAsync(
                 options.Name,
                 options.Description,
                 repoInfo,
@@ -156,7 +157,12 @@ public class ImportHandler
                 options.SimulationId,
                 options.BaselineChannel,
                 "{}", // TODO: metadata
-                groupId);
+                groupId,
+                options.SubmissionId)
+                : await apiClient.CreateDatasetAsync(
+                    options.Name, options.Description, repoInfo, options.ClimateDataset,
+                    options.TemporalResolution, options.SimulationId, options.BaselineChannel,
+                    "{}", groupId);
 
             // Process each output file, skipping stale ones
             foreach (string outputFile in outputFiles)
@@ -173,17 +179,20 @@ public class ImportHandler
                 // Add it to the dataset.
                 await apiClient.AddQuantityAsync(datasetId, quantity);
             }
+            return new ImportResult(groupId, [datasetId]);
         }
         catch
         {
-            // Delete group (this will also delete all datasets in the group).
-            logger.LogInformation("Import failed; deleting group {GroupId}", groupId);
-            await apiClient.DeleteGroupAsync(groupId);
+            if (options.CleanupOnFailure)
+            {
+                logger.LogInformation("Import failed; deleting group {GroupId}", groupId);
+                await apiClient.DeleteGroupAsync(groupId);
+            }
             throw;
         }
     }
 
-    public async Task HandleSiteImport(SiteOptions options)
+    public async Task<ImportResult> HandleSiteImport(SiteOptions options)
     {
         using var _ = logger.BeginScope("importer");
 
@@ -203,6 +212,7 @@ public class ImportHandler
         int groupId = await apiClient.CreateGroupAsync(
             options.Name,
             options.Description); // TODO: metadata
+        List<int> datasetIds = [];
 
         try
         {
@@ -241,7 +251,8 @@ public class ImportHandler
 
                 Gridcell gridcell = gridcells.Single();
                 logger.LogInformation("Creating site-level dataset");
-                int datasetId = await apiClient.CreateDatasetAsync(
+                int datasetId = options.SubmissionId.HasValue
+                    ? await apiClient.CreateDatasetAsync(
                     siteName,
                     $"{options.Name} - {siteName}",
                     repoInfo,
@@ -251,7 +262,13 @@ public class ImportHandler
                     siteName,
                     options.BaselineChannel,
                     "{}", // TODO: metadata
-                    groupId);
+                    groupId,
+                    options.SubmissionId)
+                    : await apiClient.CreateDatasetAsync(
+                        siteName, $"{options.Name} - {siteName}", repoInfo,
+                        options.ClimateDataset, options.TemporalResolution, siteName,
+                        options.BaselineChannel, "{}", groupId);
+                datasetIds.Add(datasetId);
 
                 // Process each output file, skipping stale ones
                 foreach (string outputFile in outputFiles)
@@ -272,12 +289,15 @@ public class ImportHandler
                     await apiClient.AddQuantityAsync(datasetId, quantity);
                 }
             }
+            return new ImportResult(groupId, datasetIds);
         }
         catch
         {
-            // Delete group (this will also delete all datasets in the group).
-            logger.LogInformation("Import failed; deleting group {GroupId}", groupId);
-            await apiClient.DeleteGroupAsync(groupId);
+            if (options.CleanupOnFailure)
+            {
+                logger.LogInformation("Import failed; deleting group {GroupId}", groupId);
+                await apiClient.DeleteGroupAsync(groupId);
+            }
             throw;
         }
     }

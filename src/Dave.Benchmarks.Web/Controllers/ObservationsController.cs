@@ -4,12 +4,14 @@ using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Web.Models;
 using LpjGuess.Core.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dave.Benchmarks.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = AuthorizationPolicies.GitLabProtectedRef)]
 public class ObservationsController : ControllerBase
 {
     private readonly BenchmarksDbContext _dbContext;

@@ -23,10 +23,11 @@ public class OptionsTests
             "--temporal-resolution", "3-hourly"
         ];
 
-        var parse = Parser.Default.ParseArguments<GriddedOptions, SiteOptions>(args);
+        var parse = Parser.Default.ParseArguments<GriddedOptions, SiteOptions, EvaluateOptions, BenchmarkOptions>(args);
         OptionsBase found = parse.MapResult(
             (GriddedOptions opts) => opts as OptionsBase,
             (SiteOptions s) => throw new Exception("Expected GriddedOptions, got SiteOptions"),
+            (EvaluateOptions e) => throw new Exception("Expected GriddedOptions, got EvaluateOptions"),
             errs => throw new Exception("Failed to parse options: " + string.Join(", ", errs))
         );
 
@@ -49,12 +50,33 @@ public class OptionsTests
             "--temporal-resolution", "3-hourly"
         ];
 
-        var parse = Parser.Default.ParseArguments<GriddedOptions, SiteOptions>(args);
+        var parse = Parser.Default.ParseArguments<GriddedOptions, SiteOptions, EvaluateOptions, BenchmarkOptions>(args);
         bool res = parse.MapResult(
             (GriddedOptions g) => false,
             (SiteOptions s) => true,
+            (EvaluateOptions e) => false,
             errs => false
         );
         Assert.True(res);
+    }
+
+    [Fact]
+    public void Parse_EvaluateOptions_ParsesWaitAndDefaults()
+    {
+        string[] args = [
+            "evaluate",
+            "--submission-id", "42",
+            "--wait"
+        ];
+
+        var parse = Parser.Default.ParseArguments<GriddedOptions, SiteOptions, EvaluateOptions, BenchmarkOptions>(args);
+        EvaluateOptions? found = null;
+        parse.WithParsed<EvaluateOptions>(options => found = options);
+
+        Assert.NotNull(found);
+        Assert.Equal(42, found.SubmissionId);
+        Assert.True(found.Wait);
+        Assert.Equal(1800, found.TimeoutSeconds);
+        Assert.Equal(5, found.PollIntervalSeconds);
     }
 }

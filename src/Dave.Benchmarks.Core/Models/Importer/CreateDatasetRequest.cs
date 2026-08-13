@@ -68,4 +68,7 @@ public class CreateDatasetRequest
     /// Optional ID of the group to add this dataset to.
     /// </summary>
     public int? GroupId { get; set; }
+
+    /// <summary>Optional benchmark submission receiving this dataset.</summary>
+    public int? BenchmarkSubmissionId { get; set; }
 }
