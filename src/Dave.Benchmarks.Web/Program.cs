@@ -17,11 +17,20 @@ ConnectionStringsSettings connectionStringsSettings = builder.Configuration
 connectionStringsSettings.Validate();
 string defaultConnection = connectionStringsSettings.DefaultConnection;
 
-GitLabAuthenticationSettings gitLabAuthenticationSettings = builder.Configuration
-    .GetSection("Authentication:GitLab")
-    .Get<GitLabAuthenticationSettings>()
-    ?? new GitLabAuthenticationSettings();
-gitLabAuthenticationSettings.Validate();
+if (!builder.Environment.IsDevelopment())
+{
+    AuthenticationSettings authenticationSettings = builder.Configuration
+        .GetSection("Authentication:Schemes:Bearer")
+        .Get<AuthenticationSettings>()
+        ?? new AuthenticationSettings();
+    authenticationSettings.Validate();
+}
+
+AuthorisationSettings authorisationSettings = builder.Configuration
+    .GetSection("Authorisation")
+    .Get<AuthorisationSettings>()
+    ?? new AuthorisationSettings();
+authorisationSettings.Validate();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews()
@@ -36,24 +45,18 @@ builder.Services.ConfigureLogging();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.Authority = gitLabAuthenticationSettings.Authority;
-        options.Audience = gitLabAuthenticationSettings.Audience;
-        options.MapInboundClaims = false;
-        options.RequireHttpsMetadata = true;
-    });
+    .AddJwtBearer();
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AuthorizationPolicies.GitLabCi, policy =>
     {
         policy.RequireAuthenticatedUser();
-        policy.RequireClaim("project_id", gitLabAuthenticationSettings.AllowedProjectIds);
+        policy.RequireClaim("project_id", authorisationSettings.AllowedGitlabProjectIds);
     })
     .AddPolicy(AuthorizationPolicies.GitLabProtectedRef, policy =>
     {
         policy.RequireAuthenticatedUser();
-        policy.RequireClaim("project_id", gitLabAuthenticationSettings.AllowedProjectIds);
+        policy.RequireClaim("project_id", authorisationSettings.AllowedGitlabProjectIds);
         policy.RequireClaim("ref_protected", "true");
     });
 
@@ -86,13 +89,13 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 else
 {
     app.UseDeveloperExceptionPage();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 

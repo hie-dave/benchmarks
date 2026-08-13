@@ -208,8 +208,8 @@ public class ProductionApiClient : IApiClient
             BaselineChannel = baselineChannel,
             CompressedCodePatches = repoInfo.Patches,
             Metadata = metadata,
-            GroupId = groupId
-            ,BenchmarkSubmissionId = benchmarkSubmissionId
+            GroupId = groupId,
+            BenchmarkSubmissionId = benchmarkSubmissionId
         };
 
         var response = await PostAsync(createEndpoint, request);

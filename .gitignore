@@ -3,3 +3,4 @@ obj/
 wwwroot/
 coverage/
 TestResults/
+.vscode/.cli-debug.env

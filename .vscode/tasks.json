@@ -4,6 +4,26 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "prepare-cli-debug",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "build",
+                "write-local-jwt-environment"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "write-local-jwt-environment",
+            "type": "process",
+            "command": "bash",
+            "args": [
+                "${workspaceFolder}/.vscode/export-user-jwt",
+                "${workspaceFolder}/src/Dave.Benchmarks.Web/Dave.Benchmarks.Web.csproj",
+                "${workspaceFolder}/.vscode/.cli-debug.env"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "build",
             "command": "dotnet",
             "type": "process",

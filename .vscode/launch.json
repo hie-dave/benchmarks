@@ -8,7 +8,7 @@
             "name": "CLI (Site)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
+            "preLaunchTask": "prepare-cli-debug",
             // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/src/Dave.Benchmarks.CLI/bin/Debug/net9.0/Dave.Benchmarks.CLI.dll",
             "args": [
@@ -23,9 +23,11 @@
                 "--temporal-resolution",
                 "3hour",
                 "--name",
-                "dave"
+                "dave",
+                "--cleanup-on-failure"
             ],
             "cwd": "${workspaceFolder}/src/Dave.Benchmarks.CLI",
+            "envFile": "${workspaceFolder}/.vscode/.cli-debug.env",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false
@@ -37,7 +39,7 @@
             "name": "CLI (Gridded)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
+            "preLaunchTask": "prepare-cli-debug",
             // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/src/Dave.Benchmarks.CLI/bin/Debug/net9.0/Dave.Benchmarks.CLI.dll",
             "args": [
@@ -60,6 +62,7 @@
                 "narclim2_ACCESS-ESM1-5_historical_WRF412R3",
             ],
             "cwd": "${workspaceFolder}/src/Dave.Benchmarks.CLI",
+            "envFile": "${workspaceFolder}/.vscode/.cli-debug.env",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false
