@@ -30,6 +30,24 @@ public class DatasetGroup
     /// </summary>
     public bool IsComplete { get; set; }
 
+    /// <summary>Whether this observation release is currently selected for evaluation.</summary>
+    public bool IsActive { get; set; }
+
+    /// <summary>
+    /// Uniquely identifies an active observation collection. This is null for
+    /// inactive releases, allowing the database to enforce one active version.
+    /// </summary>
+    public string? ActiveCollectionKey { get; set; }
+
+    /// <summary>The kind of datasets this group may contain.</summary>
+    public DatasetGroupKind Kind { get; set; }
+
+    /// <summary>Stable source identifier for a versioned observation collection.</summary>
+    public string Source { get; set; } = string.Empty;
+
+    /// <summary>Version of this observation release.</summary>
+    public string Version { get; set; } = string.Empty;
+
     /// <summary>
     /// The datasets that belong to this group.
     /// </summary>

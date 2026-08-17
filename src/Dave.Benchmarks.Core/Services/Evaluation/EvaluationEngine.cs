@@ -135,7 +135,7 @@ public class EvaluationEngine : IEvaluationEngine
 
         List<ObservationDataset> activeObservations = await db.Datasets
             .OfType<ObservationDataset>()
-            .Where(d => d.Active)
+            .Where(d => d.Group != null && d.Group.IsComplete && d.Group.IsActive)
             .Include(d => d.Variables)
                 .ThenInclude(v => v.Layers)
             .ToListAsync(cancellationToken);
@@ -187,7 +187,7 @@ public class EvaluationEngine : IEvaluationEngine
                     VariableLayer? baselineLayer = baselineVar?.Layers
                         .FirstOrDefault(l => l.Name.Equals(candidateLayer.Name, StringComparison.InvariantCultureIgnoreCase));
 
-                    EvaluationResult? baselineResult = baselineRun?.Datasets
+                    EvaluationResult? baselineResult = baseline == null ? null : baselineRun?.Datasets
                         .FirstOrDefault(d => d.CandidateDatasetId == baseline.Id)?.Results
                         .FirstOrDefault(r => r.CandidateVariableId == baselineVar?.Id &&
                                     r.CandidateLayerId == baselineLayer?.Id &&
@@ -326,7 +326,8 @@ public class EvaluationEngine : IEvaluationEngine
                             c.StandId == obs.StandId &&
                             c.PatchId == obs.PatchId &&
                             c.IndividualNumber == obs.IndividualNumber)
-                .Select(c => new { Point = c, Distance = GeoDistance.HaversineKm(obs.Latitude, obs.Longitude, c.Latitude, c.Longitude) })
+                            .Where(c => obs.Latitude.HasValue && obs.Longitude.HasValue && c.Latitude.HasValue && c.Longitude.HasValue)
+                            .Select(c => new { Point = c, Distance = GeoDistance.HaversineKm(obs.Latitude!.Value, obs.Longitude!.Value, c.Latitude!.Value, c.Longitude!.Value) })
                 .Where(x => x.Distance <= maxDistanceKm)
                 .OrderBy(x => x.Distance)
                 .Select(x => (PointValue?)x.Point)
@@ -402,16 +403,16 @@ public class EvaluationEngine : IEvaluationEngine
 
     private readonly record struct PointKey(
         DateTime Timestamp,
-        double Latitude,
-        double Longitude,
+        double? Latitude,
+        double? Longitude,
         int? StandId,
         int? PatchId,
         int? IndividualNumber);
 
     private readonly record struct PointValue(
         DateTime Timestamp,
-        double Latitude,
-        double Longitude,
+        double? Latitude,
+        double? Longitude,
         double Value,
         int? StandId,
         int? PatchId,

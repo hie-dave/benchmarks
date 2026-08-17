@@ -5,6 +5,28 @@
             // Use IntelliSense to find out which attributes exist for C# debugging
             // Use hover for the description of the existing attributes
             // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
+            "name": "CLI (Observation Ingest)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-cli-debug",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/src/Dave.Benchmarks.CLI/bin/Debug/net9.0/Dave.Benchmarks.CLI.dll",
+            "args": [
+                "observations",
+                "--manifest",
+                "${workspaceFolder}/fluxes.yml",
+                "--activate"
+            ],
+            "cwd": "${workspaceFolder}/src/Dave.Benchmarks.CLI",
+            "envFile": "${workspaceFolder}/.vscode/.cli-debug.env",
+            // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            // Use IntelliSense to find out which attributes exist for C# debugging
+            // Use hover for the description of the existing attributes
+            // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
             "name": "CLI (Benchmark)",
             "type": "coreclr",
             "request": "launch",

@@ -125,6 +125,19 @@ public class BenchmarksDbContext : DbContext
         modelBuilder.Entity<ObservationDataset>()
             .HasIndex(d => d.Active);
 
+        modelBuilder.Entity<DatasetGroup>(entity =>
+        {
+            entity.Property(g => g.Name).HasMaxLength(128).IsRequired();
+            entity.Property(g => g.Source).HasMaxLength(256);
+            entity.Property(g => g.Version).HasMaxLength(128);
+            entity.Property(g => g.Kind).HasDefaultValue(DatasetGroupKind.Prediction);
+            entity.Property(g => g.IsActive).HasDefaultValue(false);
+            entity.Property(g => g.ActiveCollectionKey).HasMaxLength(385);
+            entity.HasIndex(g => new { g.Source, g.Name, g.Version }).IsUnique();
+            entity.HasIndex(g => new { g.Source, g.Name, g.IsActive });
+            entity.HasIndex(g => g.ActiveCollectionKey).IsUnique();
+        });
+
         // Configure relationships with cascade delete
         modelBuilder.Entity<Dataset>()
             .HasOne(d => d.Group)

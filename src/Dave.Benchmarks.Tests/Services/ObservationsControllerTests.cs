@@ -110,8 +110,10 @@ public class ObservationsControllerTests
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
         ObservationsController controller = CreateController(db);
+        DatasetGroup group = AddObservationGroup(db, DatasetGroupKind.ObservationGridded);
 
         CreateObservationDatasetRequest request = BaseCreateObservationRequest();
+        request.GroupId = group.Id;
         request.Strategy = MatchingStrategy.Nearest;
         request.MaxDistance = 25;
 
@@ -135,7 +137,10 @@ public class ObservationsControllerTests
             Description = "desc",
             CreatedAt = DateTime.UtcNow,
             IsComplete = false,
-            Metadata = "{}"
+            Metadata = "{}",
+            Kind = DatasetGroupKind.ObservationGridded,
+            Source = "source",
+            Version = "v1"
         };
         db.DatasetGroups.Add(group);
         db.SaveChanges();
@@ -195,7 +200,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         ObservationsController controller = CreateController(db);
 
         ActionResult<int> result = await controller.CreateVariable(dataset.Id, new CreateVariableRequest
@@ -214,7 +219,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         ObservationsController controller = CreateController(db);
 
         ActionResult<int> result = await controller.CreateVariable(dataset.Id, new CreateVariableRequest
@@ -234,7 +239,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         (Variable variable, _) = EvaluationSeed.AddVariableLayer(db, dataset, AggregationLevel.Gridcell, variableName: "lai", units: "m2m2");
         ObservationsController controller = CreateController(db);
 
@@ -255,7 +260,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         ObservationsController controller = CreateController(db);
 
         ActionResult<int> result = await controller.CreateVariable(dataset.Id, new CreateVariableRequest
@@ -278,7 +283,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         EvaluationSeed.EnsureIndividual(db, dataset, individualNumber: 7, pftName: "Tree");
         ObservationsController controller = CreateController(db);
 
@@ -333,7 +338,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         (Variable variable, _) = EvaluationSeed.AddVariableLayer(db, dataset, variableName: "lai", layerName: "old");
         ObservationsController controller = CreateController(db);
 
@@ -385,7 +390,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         (_, VariableLayer layer) = EvaluationSeed.AddVariableLayer(db, dataset, AggregationLevel.Gridcell);
         ObservationsController controller = CreateController(db);
 
@@ -403,7 +408,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         (_, VariableLayer layer) = EvaluationSeed.AddVariableLayer(db, dataset, AggregationLevel.Stand);
         ObservationsController controller = CreateController(db);
 
@@ -421,7 +426,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         (_, VariableLayer layer) = EvaluationSeed.AddVariableLayer(db, dataset, AggregationLevel.Patch);
         ObservationsController controller = CreateController(db);
 
@@ -436,7 +441,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db);
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(db, active: false);
         (_, VariableLayer layer) = EvaluationSeed.AddVariableLayer(db, dataset, AggregationLevel.Individual);
         EvaluationSeed.EnsureIndividual(db, dataset, individualNumber: 9, pftName: "Tree");
         ObservationsController controller = CreateController(db);
@@ -480,7 +485,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset obs = EvaluationSeed.CreateObservationDataset(db, active: false);
+        ObservationDataset obs = EvaluationSeed.CreateObservationDataset(db, active: false, complete: true);
         ObservationsController controller = CreateController(db);
 
         ActionResult result = await controller.ActivateDataset(obs.Id);
@@ -506,7 +511,7 @@ public class ObservationsControllerTests
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
-        ObservationDataset obs = EvaluationSeed.CreateObservationDataset(db, active: false);
+        ObservationDataset obs = EvaluationSeed.CreateObservationDataset(db, active: false, complete: true);
         ObservationsController controller = CreateController(db);
 
         ActionResult result = await controller.DeactivateDataset(obs.Id);
@@ -528,6 +533,79 @@ public class ObservationsControllerTests
         Assert.False(db.Datasets.OfType<ObservationDataset>().Single(d => d.Id == obs.Id).Active);
     }
 
+    [Fact]
+    public async Task ActivateGroup_ReplacesActiveVersionOfSameCollection()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        DatasetGroup oldRelease = AddObservationGroup(db, DatasetGroupKind.ObservationSite);
+        oldRelease.Name = "ozflux";
+        oldRelease.Version = "2025";
+        oldRelease.IsComplete = true;
+        oldRelease.IsActive = true;
+        oldRelease.ActiveCollectionKey = $"{oldRelease.Source}\n{oldRelease.Name}";
+        ObservationDataset oldDataset = AddSiteDataset(db, oldRelease, "AU-Tum", active: true);
+
+        DatasetGroup newRelease = AddObservationGroup(db, DatasetGroupKind.ObservationSite);
+        newRelease.Name = oldRelease.Name;
+        newRelease.Version = "2026";
+        newRelease.IsComplete = true;
+        ObservationDataset newDataset = AddSiteDataset(db, newRelease, "AU-Tum", active: false);
+        db.SaveChanges();
+
+        ActionResult result = await CreateController(db).ActivateGroup(newRelease.Id, CancellationToken.None);
+
+        Assert.IsType<OkResult>(result);
+        DatasetGroup persistedOldRelease = db.DatasetGroups.Single(g => g.Id == oldRelease.Id);
+        DatasetGroup persistedNewRelease = db.DatasetGroups.Single(g => g.Id == newRelease.Id);
+        Assert.False(persistedOldRelease.IsActive);
+        Assert.Null(persistedOldRelease.ActiveCollectionKey);
+        Assert.False(db.Datasets.OfType<ObservationDataset>().Single(d => d.Id == oldDataset.Id).Active);
+        Assert.True(persistedNewRelease.IsActive);
+        Assert.Equal($"{newRelease.Source}\n{newRelease.Name}", persistedNewRelease.ActiveCollectionKey);
+        Assert.True(db.Datasets.OfType<ObservationDataset>().Single(d => d.Id == newDataset.Id).Active);
+    }
+
+    [Fact]
+    public void ActiveCollectionKey_AllowsOnlyOneActiveVersion()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        const string key = "source\nozflux";
+        db.DatasetGroups.AddRange(
+            new DatasetGroup
+            {
+                Name = "ozflux", Source = "source", Version = "1", Description = "one",
+                CreatedAt = DateTime.UtcNow, Kind = DatasetGroupKind.ObservationSite,
+                IsComplete = true, IsActive = true, ActiveCollectionKey = key
+            },
+            new DatasetGroup
+            {
+                Name = "ozflux", Source = "source", Version = "2", Description = "two",
+                CreatedAt = DateTime.UtcNow, Kind = DatasetGroupKind.ObservationSite,
+                IsComplete = true, IsActive = true, ActiveCollectionKey = key
+            });
+
+        Assert.Throws<Microsoft.EntityFrameworkCore.DbUpdateException>(() => db.SaveChanges());
+    }
+
+    [Fact]
+    public async Task CreateGroup_WithInvalidMetadata_ReturnsBadRequest()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        CreateObservationGroupRequest request = new()
+        {
+            Name = "ozflux", Source = "source", Version = "1",
+            Kind = DatasetGroupKind.ObservationSite, Metadata = "not-json"
+        };
+
+        ActionResult<int> result = await CreateController(db).CreateGroup(request, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Empty(db.DatasetGroups);
+    }
+
     private static ObservationsController CreateController(BenchmarksDbContext db)
     {
         return new ObservationsController(db, Mock.Of<ILogger<ObservationsController>>());
@@ -545,5 +623,31 @@ public class ObservationsControllerTests
             TemporalResolution = "daily",
             Metadata = "{}"
         };
+    }
+
+    private static DatasetGroup AddObservationGroup(BenchmarksDbContext db, DatasetGroupKind kind)
+    {
+        DatasetGroup group = new()
+        {
+            Name = $"group-{Guid.NewGuid():N}", Source = "source", Version = "v1",
+            Description = "test", CreatedAt = DateTime.UtcNow, Kind = kind, Metadata = "{}"
+        };
+        db.DatasetGroups.Add(group);
+        db.SaveChanges();
+        return group;
+    }
+
+    private static ObservationDataset AddSiteDataset(
+        BenchmarksDbContext db, DatasetGroup group, string site, bool active)
+    {
+        ObservationDataset dataset = new()
+        {
+            Name = site, Description = site, CreatedAt = DateTime.UtcNow,
+            Source = group.Source, Version = group.Version, SpatialResolution = "site",
+            TemporalResolution = "daily", Metadata = "{}", SimulationId = site,
+            MatchingStrategy = MatchingStrategy.ByName, Group = group, Active = active
+        };
+        db.Datasets.Add(dataset);
+        return dataset;
     }
 }

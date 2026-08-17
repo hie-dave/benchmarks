@@ -13,10 +13,10 @@ public class CreateObservationDatasetRequest
     [StringLength(500)]
     public string Description { get; set; } = string.Empty;
 
-    [Required]
+    // Retained for wire compatibility; the release group is authoritative.
     public string Source { get; set; } = string.Empty;
 
-    [Required]
+    // Retained for wire compatibility; the release group is authoritative.
     public string Version { get; set; } = string.Empty;
 
     public string SpatialResolution { get; set; } = string.Empty;

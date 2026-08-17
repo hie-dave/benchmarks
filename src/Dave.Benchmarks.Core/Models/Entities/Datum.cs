@@ -23,12 +23,12 @@ public abstract class Datum
     /// <summary>
     /// The longitude in degrees.
     /// </summary>
-    public double Longitude { get; set; }
+    public double? Longitude { get; set; }
 
     /// <summary>
     /// The latitude in degrees.
     /// </summary>
-    public double Latitude { get; set; }
+    public double? Latitude { get; set; }
 
     // Navigation properties
     /// <summary>

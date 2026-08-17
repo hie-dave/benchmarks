@@ -18,7 +18,9 @@ public class ProductionApiClient : IApiClient
     private enum Controller
     {
         Data,
-        Predictions
+        Predictions,
+        Evaluation,
+        Observations
     }
 
     /// <summary>
@@ -31,7 +33,15 @@ public class ProductionApiClient : IApiClient
     /// </summary>
     private const string dataApi = "api/data";
 
+    /// <summary>
+    /// Endpoint of the evaluation API.
+    /// </summary>
     private const string evaluationApi = "api/evaluation";
+
+    /// <summary>
+    /// Endpoint of the observations API.
+    /// </summary>
+    private const string observationsApi = "api/observations";
 
     /// <summary>
     /// API endpoint used to create a dataset group.
@@ -92,6 +102,64 @@ public class ProductionApiClient : IApiClient
     {
         this.httpClient = httpClient;
         this.logger = logger;
+    }
+
+    public void SetBearerToken(string token) => httpClient.DefaultRequestHeaders.Authorization =
+        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+    public async Task<int> CreateObservationGroupAsync(
+        string name, string source, string version, string description,
+        DatasetGroupKind kind, string metadata,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new { name, source, version, description, kind, metadata };
+        HttpResponseMessage response = await PostAsync("groups", request, Controller.Observations, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<int>(cancellationToken);
+    }
+
+    public async Task<int> CreateObservationDatasetAsync(
+        int groupId, string name, string description, string temporalResolution,
+        string simulationId, MatchingStrategy strategy, int? maxDistance,
+        string metadata, CancellationToken cancellationToken = default)
+    {
+        var request = new
+        {
+            groupId, name, description, temporalResolution, simulationId,
+            strategy, maxDistance, metadata,
+            spatialResolution = strategy == MatchingStrategy.ByName ? "site" : "gridded"
+        };
+        HttpResponseMessage response = await PostAsync("datasets/create", request, Controller.Observations, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<int>(cancellationToken);
+    }
+
+    public async Task<int> CreateObservationVariableAsync(
+        int datasetId, CreateVariableRequest request, CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response = await PostAsync($"{datasetId}/variables", request, Controller.Observations, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<int>(cancellationToken);
+    }
+
+    public async Task<int> CreateObservationLayerAsync(
+        int variableId, CreateLayerRequest request, CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response = await PostAsync($"variables/{variableId}/layers", request, Controller.Observations, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<int>(cancellationToken);
+    }
+
+    public async Task AppendObservationDataAsync(
+        int layerId, AppendObservationDataRequest request, CancellationToken cancellationToken = default)
+    {
+        await PostAsync($"layers/{layerId}/data", request, Controller.Observations, cancellationToken);
+    }
+
+    public async Task CompleteObservationGroupAsync(int groupId, CancellationToken cancellationToken = default)
+    {
+        await PostAsync($"groups/{groupId}/complete", Controller.Observations, cancellationToken);
+    }
+
+    public async Task ActivateObservationGroupAsync(int groupId, CancellationToken cancellationToken = default)
+    {
+        await PostAsync($"groups/{groupId}/activate", Controller.Observations, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -321,12 +389,15 @@ public class ProductionApiClient : IApiClient
     /// Performs a POST request to the specified endpoint with no body.
     /// </summary>
     /// <param name="endpoint">The API endpoint, relative to the predictions API base URL.</param>
-    private async Task<HttpResponseMessage> PostAsync(string endpoint, Controller controller = Controller.Predictions)
+    private async Task<HttpResponseMessage> PostAsync(
+        string endpoint,
+        Controller controller = Controller.Predictions,
+        CancellationToken cancellationToken = default)
     {
         endpoint = $"{GetControllerRoute(controller)}/{endpoint}";
         logger.LogDebug("Sending POST request to {endpoint}", endpoint);
 
-        var response = await httpClient.PostAsync(endpoint, null);
+        var response = await httpClient.PostAsync(endpoint, null, cancellationToken);
         await ValidateResponseAsync(response);
         return response;
     }
@@ -350,7 +421,9 @@ public class ProductionApiClient : IApiClient
     /// </summary>
     /// <param name="endpoint">The API endpoint, relative to the predictions API base URL.</param>
     /// <param name="request">The object to be POSTed.</param>
-    private async Task<HttpResponseMessage> PostAsync(string endpoint, object request, Controller controller = Controller.Predictions)
+    private async Task<HttpResponseMessage> PostAsync(string endpoint, object request,
+        Controller controller = Controller.Predictions,
+        CancellationToken cancellationToken = default)
     {
         endpoint = $"{GetControllerRoute(controller)}/{endpoint}";
 
@@ -360,7 +433,7 @@ public class ProductionApiClient : IApiClient
         double size = Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(request)) / (1024.0 * 1024.0);
         logger.LogDebug("Request size: {size:f1}MiB", size);
 
-        var response = await httpClient.PostAsJsonAsync(endpoint, request);
+        var response = await httpClient.PostAsJsonAsync(endpoint, request, cancellationToken);
         await ValidateResponseAsync(response);
         return response;
     }
@@ -391,6 +464,8 @@ public class ProductionApiClient : IApiClient
         {
             Controller.Data => dataApi,
             Controller.Predictions => predictionsApi,
+            Controller.Evaluation => evaluationApi,
+            Controller.Observations => observationsApi,
             _ => throw new ArgumentException(nameof(controller))
         };
     }

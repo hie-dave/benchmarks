@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dave.Benchmarks.Web.Migrations
 {
     [DbContext(typeof(BenchmarksDbContext))]
-    [Migration("20260813035110_InitialCreate")]
+    [Migration("20260817042149_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -161,6 +161,10 @@ namespace Dave.Benchmarks.Web.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ActiveCollectionKey")
+                        .HasMaxLength(385)
+                        .HasColumnType("varchar(385)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -168,8 +172,18 @@ namespace Dave.Benchmarks.Web.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsComplete")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Metadata")
                         .IsRequired()
@@ -177,9 +191,28 @@ namespace Dave.Benchmarks.Web.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ActiveCollectionKey")
+                        .IsUnique();
+
+                    b.HasIndex("Source", "Name", "IsActive");
+
+                    b.HasIndex("Source", "Name", "Version")
+                        .IsUnique();
 
                     b.ToTable("DatasetGroups");
                 });
@@ -192,13 +225,13 @@ namespace Dave.Benchmarks.Web.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double>("Latitude")
+                    b.Property<double?>("Latitude")
                         .HasColumnType("double");
 
                     b.Property<int>("LayerId")
                         .HasColumnType("int");
 
-                    b.Property<double>("Longitude")
+                    b.Property<double?>("Longitude")
                         .HasColumnType("double");
 
                     b.Property<DateTime>("Timestamp")

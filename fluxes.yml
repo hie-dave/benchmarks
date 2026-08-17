@@ -1,0 +1,16 @@
+collection: ozflux
+version: "2026-08"
+source: OzFlux
+description: Data from Flux Towers
+
+files:
+  - path: data/gpp_solo.csv.gz
+    date_column: date
+    site_column: site
+    temporal_resolution: daily
+    variables:
+      - column: gpp_solo
+        name: gpp
+        units: gC m-2 day-1
+        level: gridcell
+        layer: mean

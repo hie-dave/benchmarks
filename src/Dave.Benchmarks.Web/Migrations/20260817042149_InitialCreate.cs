@@ -55,12 +55,20 @@ namespace Dave.Benchmarks.Web.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    Name = table.Column<string>(type: "longtext", nullable: false)
+                    Name = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Description = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     IsComplete = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    IsActive = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
+                    ActiveCollectionKey = table.Column<string>(type: "varchar(385)", maxLength: 385, nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Kind = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
+                    Source = table.Column<string>(type: "varchar(256)", maxLength: 256, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Version = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     Metadata = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
@@ -329,8 +337,8 @@ namespace Dave.Benchmarks.Web.Migrations
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     Value = table.Column<double>(type: "double", nullable: false),
                     Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    Longitude = table.Column<double>(type: "double", nullable: false),
-                    Latitude = table.Column<double>(type: "double", nullable: false),
+                    Longitude = table.Column<double>(type: "double", nullable: true),
+                    Latitude = table.Column<double>(type: "double", nullable: true),
                     VariableId = table.Column<int>(type: "int", nullable: false),
                     LayerId = table.Column<int>(type: "int", nullable: false)
                 },
@@ -539,6 +547,23 @@ namespace Dave.Benchmarks.Web.Migrations
                 name: "IX_BenchmarkSubmissions_Status",
                 table: "BenchmarkSubmissions",
                 column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DatasetGroups_ActiveCollectionKey",
+                table: "DatasetGroups",
+                column: "ActiveCollectionKey",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DatasetGroups_Source_Name_IsActive",
+                table: "DatasetGroups",
+                columns: new[] { "Source", "Name", "IsActive" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DatasetGroups_Source_Name_Version",
+                table: "DatasetGroups",
+                columns: new[] { "Source", "Name", "Version" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Datasets_Active",

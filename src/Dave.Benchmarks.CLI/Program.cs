@@ -31,6 +31,8 @@ builder.Services.AddTransient<CommandRunner>();
 builder.Services.AddTransient<ImportHandler>();
 builder.Services.AddTransient<EvaluateHandler>();
 builder.Services.AddTransient<BenchmarkHandler>();
+builder.Services.AddTransient<ObservationImportHandler>();
+builder.Services.AddTransient<GitLabCuratorAuthenticator>();
 builder.Services.AddTransient<IGridlistParser, GridlistParser>();
 builder.Services.AddSingleton<IOutputFileTypeResolver, OutputFileTypeResolver>();
 builder.Services.AddSingleton<IFileSystem, PhysicalFileSystem>();
@@ -44,14 +46,9 @@ builder.Services.AddHttpClient<ProductionApiClient>((sp, client) =>
 
     string token = Environment.GetEnvironmentVariable(ApiSettings.TokenEnvironmentVariable)
         ?? settings.AccessToken;
-    if (string.IsNullOrWhiteSpace(token))
-    {
-        throw new InvalidOperationException(
-            $"API authentication token is missing. Set {ApiSettings.TokenEnvironmentVariable}.");
-    }
-
-    client.DefaultRequestHeaders.Authorization =
-        new AuthenticationHeaderValue("Bearer", token.Trim());
+    if (!string.IsNullOrWhiteSpace(token))
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token.Trim());
 });
 
 // Configure logging
@@ -81,9 +78,10 @@ async Task<int> RunApiCommand<THandler, TOptions>(TOptions options, Func<THandle
 }
 
 // Parse command line
-return await Parser.Default.ParseArguments<GriddedOptions, SiteOptions, EvaluateOptions, BenchmarkOptions>(args).MapResult(
+return await Parser.Default.ParseArguments<GriddedOptions, SiteOptions, EvaluateOptions, BenchmarkOptions, ObservationImportOptions>(args).MapResult(
         (GriddedOptions opts) => Run(opts, (ImportHandler handler, GriddedOptions opts) => handler.HandleGriddedImport(opts)),
         (SiteOptions opts) => Run(opts, (ImportHandler handler, SiteOptions opts) => handler.HandleSiteImport(opts)),
         (EvaluateOptions opts) => RunApiCommand(opts, (EvaluateHandler handler, EvaluateOptions opts) => handler.RunAsync(opts)),
         (BenchmarkOptions opts) => RunApiCommand(opts, (BenchmarkHandler handler, BenchmarkOptions opts) => handler.RunAsync(opts)),
+        (ObservationImportOptions opts) => Run(opts, (ObservationImportHandler handler, ObservationImportOptions opts) => handler.RunAsync(opts)),
         _ => Task.FromResult(1));

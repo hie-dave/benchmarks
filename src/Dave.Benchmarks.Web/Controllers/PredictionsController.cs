@@ -34,7 +34,8 @@ public class PredictionsController : ControllerBase
             Name = request.Name,
             Description = request.Description,
             CreatedAt = DateTime.UtcNow,
-            Metadata = request.Metadata
+            Metadata = request.Metadata,
+            Kind = DatasetGroupKind.Prediction
         };
 
         _dbContext.DatasetGroups.Add(group);
@@ -73,6 +74,8 @@ public class PredictionsController : ControllerBase
 
             if (group.IsComplete)
                 return BadRequest($"Group {request.GroupId.Value} is marked as complete and cannot accept new datasets");
+            if (group.Kind != DatasetGroupKind.Prediction)
+                return BadRequest($"Group {request.GroupId.Value} is not a prediction group");
         }
 
         if (request.BenchmarkSubmissionId.HasValue)

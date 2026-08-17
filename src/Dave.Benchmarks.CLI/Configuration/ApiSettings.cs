@@ -11,6 +11,10 @@ public class ApiSettings
     public string WebApiUrl { get; set; } = string.Empty;
 
     public string AccessToken { get; set; } = string.Empty;
+
+    public string GitLabUrl { get; set; } = string.Empty;
+
+    public string GitLabOAuthClientId { get; set; } = string.Empty;
     
     public void Validate()
     {

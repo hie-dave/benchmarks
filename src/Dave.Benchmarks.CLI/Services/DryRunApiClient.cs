@@ -11,6 +11,13 @@ namespace Dave.Benchmarks.CLI.Services;
 /// </summary>
 public class DryRunApiClient : IApiClient
 {
+    public Task<int> CreateObservationGroupAsync(string name, string source, string version, string description, DatasetGroupKind kind, string metadata, CancellationToken cancellationToken = default) => Task.FromResult(1);
+    public Task<int> CreateObservationDatasetAsync(int groupId, string name, string description, string temporalResolution, string simulationId, MatchingStrategy strategy, int? maxDistance, string metadata, CancellationToken cancellationToken = default) => Task.FromResult(1);
+    public Task<int> CreateObservationVariableAsync(int datasetId, CreateVariableRequest request, CancellationToken cancellationToken = default) => Task.FromResult(1);
+    public Task<int> CreateObservationLayerAsync(int variableId, CreateLayerRequest request, CancellationToken cancellationToken = default) => Task.FromResult(1);
+    public Task AppendObservationDataAsync(int layerId, AppendObservationDataRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task CompleteObservationGroupAsync(int groupId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task ActivateObservationGroupAsync(int groupId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     /// <summary>
     /// The logging service.
     /// </summary>

@@ -38,15 +38,23 @@ if (( ${#live_jwt_ids[@]} == 0 )); then
     fi
 
     echo "No live development JWT found; creating one." >&2
-    temporary_appsettings=$(mktemp)
+    # dotnet user-jwts requires an appsettings filename with a .json extension.
+    temporary_appsettings=$(mktemp --suffix=.json)
     trap 'rm -f "$temporary_appsettings"' EXIT
-    printf '{}\n' > "$temporary_appsettings"
-    dotnet user-jwts create \
+    # Work on a copy: user-jwts rewrites its appsettings file when tokens are
+    # created or removed, but our checked-in development trust settings must
+    # remain stable.
+    cp "$development_settings" "$temporary_appsettings"
+    if ! dotnet user-jwts create \
         --project "$jwt_project" \
         --appsettings-file "$temporary_appsettings" \
         --claim "project_id=${allowed_project_ids[0]}" \
         --claim "ref_protected=true" \
-        --output json >/dev/null
+        --role "observation_curator" \
+        --output json >/dev/null; then
+        echo "Failed to create development JWT." >&2
+        exit 1
+    fi
 
     mapfile -t live_jwt_ids < <(get_live_jwt_ids)
 fi

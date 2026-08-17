@@ -67,6 +67,105 @@ For production environments using TCP/IP:
 }
 ```
 
+Configure GitLab CI and curator authentication in `appsettings.json`, or
+preferably with environment variables in deployed environments:
+
+```json
+{
+  "Authentication": {
+    "Schemes": {
+      "Bearer": {
+        "Authority": "https://gitlab.example.com",
+        "MapInboundClaims": false,
+        "ValidAudiences": [ "https://benchmarks.example.com" ]
+      }
+    }
+  },
+  "Authorisation": {
+    "AllowedGitlabProjectIds": [ "12345" ]
+  },
+  "GitLabOAuth": {
+    "TokenIssuer": "https://benchmarks.example.com",
+    "SigningKey": "<base64-encoded random key of at least 32 bytes>",
+    "TokenLifetimeMinutes": 60
+  }
+}
+```
+
+`Authority` is the base URI of the one trusted GitLab instance.
+`ValidAudiences` contains the audience configured for job ID tokens. The server
+also uses the authority's API to verify curator access. `TokenIssuer` is the
+public HTTPS URI identifying this benchmark server, and `SigningKey` signs its
+short-lived curator tokens. Keep the signing key out of source control; for
+example, configure these values as:
+
+```text
+Authentication__Schemes__Bearer__Authority
+Authentication__Schemes__Bearer__ValidAudiences__0
+Authorisation__AllowedGitlabProjectIds__0
+GitLabOAuth__TokenIssuer
+GitLabOAuth__SigningKey
+```
+
+Project IDs are used instead of project paths so renaming a project does not
+change the trust rule. Production authority, audience, and token-issuer URIs
+must all use HTTPS.
+
+The prediction, submission, and evaluation mutation APIs require a valid ID
+token from an allowed GitLab project. Baseline acceptance and destructive data
+operations additionally require the token's `ref_protected` claim to be
+`true`. Observation ingestion instead requires a curator token issued by the
+benchmark server after it verifies that the interactive GitLab user has at
+least Maintainer access to one configured project.
+
+Request a short-lived ID token in each GitLab job that calls the API. Its `aud`
+must exactly match one configured `ValidAudiences` value:
+
+```yaml
+benchmark_sites:
+  id_tokens:
+    BENCHMARKS_ID_TOKEN:
+      aud: https://benchmarks.example.com
+  script:
+    - export DAVE_BENCHMARKS_TOKEN="$BENCHMARKS_ID_TOKEN"
+    - >-
+      dotnet run --project src/Dave.Benchmarks.CLI -- benchmark
+      --repo-path .
+      --name "MR site benchmarks"
+      --description "Site benchmarks for ${CI_COMMIT_SHA}"
+      --climate-dataset OzFlux
+      --temporal-resolution 3-hourly
+      --merge-request-id "$CI_MERGE_REQUEST_IID"
+      --pipeline-id "$CI_PIPELINE_ID"
+      --source-branch "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+      --target-branch "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      --commit-sha "$CI_COMMIT_SHA"
+      --commit-message "$CI_COMMIT_MESSAGE"
+```
+
+The importer reads `DAVE_BENCHMARKS_TOKEN` and sends it as an HTTP bearer token
+for all production API requests. `benchmark` creates a submission, directly
+invokes the site importer, completes the submission, starts one aggregate
+evaluation, and polls it. It exits 0 on pass, 2 on a completed gate failure,
+and 1 on an operational/import/evaluation error. The default timeout is 1800
+seconds and the default polling interval is 5 seconds; override them with
+`--timeout-seconds` and `--poll-interval-seconds`.
+
+The lower-level `site`, `gridded`, and `evaluate --submission-id ...` verbs
+remain available for development and debugging. Partial imports are retained
+by default. Pass `--cleanup-on-failure` to `site`, `gridded`, or `benchmark` to
+restore the old behavior of deleting the partially imported dataset group.
+
+For a manual request with curl:
+
+```bash
+curl \
+  --header "Authorization: Bearer ${BENCHMARKS_ID_TOKEN}" \
+  --header "Content-Type: application/json" \
+  --data '{"benchmarkSubmissionId":42}' \
+  https://benchmarks.example.com/api/evaluation/run
+```
+
 4. Run the application:
 
 ```bash
@@ -114,4 +213,53 @@ mysql -u dave -p dave_benchmarks < backup.sql
 
 ## CLI Tool Usage
 
-TODO: Add instructions for using the CLI tool to upload model outputs
+### Importing observations
+
+Register a GitLab OAuth application for the importer and enable the device
+authorization flow. Configure its application/client ID as
+`GitLabOAuthClientId` in the CLI settings; no client secret is embedded in the
+CLI. Running the observation importer starts the GitLab device-login flow,
+exchanges the resulting OAuth access token with the benchmark server, and uses
+the returned short-lived curator token for ingestion.
+
+An observation release is either `site` or `gridded`; it cannot mix the two.
+Site files are split into one dataset per distinct site name and contain no
+invented coordinates. A release becomes immutable when completed. With
+`--activate`, activation occurs after completion and atomically replaces the
+active version of the same source/collection.
+
+Example site manifest:
+
+```yaml
+collection: ozflux
+source: ozflux
+version: 2026-08-17
+description: OzFlux tower observations
+kind: site
+metadata: '{}'
+files:
+  - path: flux.csv.gz
+    date_column: date
+    site_column: site
+    temporal_resolution: daily
+    variables:
+      - column: gpp
+        name: gpp
+        description: Gross primary productivity
+        units: kgC/m2/day
+        level: gridcell
+        layer: total
+```
+
+Import and activate it with:
+
+```bash
+dotnet run --project src/Dave.Benchmarks.CLI -- \
+  observations --manifest observations.yaml --activate
+```
+
+Input may be plain CSV or gzip-compressed CSV (`.gz`). Gridded manifests use
+`kind: gridded`, declare `longitude_column` and `latitude_column`, and select
+`matching_strategy: exact` or `nearest` (with `max_distance_km` for nearest).
+The initial importer supports gridcell-level variables and requires all files
+in one release to use the same temporal resolution.

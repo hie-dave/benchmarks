@@ -37,8 +37,25 @@ public static class EvaluationSeed
         MatchingStrategy strategy = MatchingStrategy.ExactMatch,
         int? maxDistance = null,
         bool active = true,
-        string simulationId = "")
+        string simulationId = "",
+        bool? complete = null)
     {
+        DatasetGroup group = new()
+        {
+            Name = $"observations-{Guid.NewGuid():N}",
+            Description = "test observations",
+            CreatedAt = DateTime.UtcNow,
+            IsComplete = complete ?? active,
+            IsActive = active,
+            Kind = strategy == MatchingStrategy.ByName
+                ? DatasetGroupKind.ObservationSite
+                : DatasetGroupKind.ObservationGridded,
+            Source = "source",
+            Version = "v1",
+            Metadata = "{}"
+        };
+        if (active) group.ActiveCollectionKey = $"{group.Source}\n{group.Name}";
+        db.DatasetGroups.Add(group);
         ObservationDataset dataset = new()
         {
             Name = "obs",
@@ -52,7 +69,8 @@ public static class EvaluationSeed
             Metadata = "{}",
             MatchingStrategy = strategy,
             MaxDistance = maxDistance,
-            Active = active
+            Active = active,
+            Group = group
         };
 
         db.Datasets.Add(dataset);
