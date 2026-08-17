@@ -277,7 +277,8 @@ public class ObservationsController : ControllerBase
             .FirstOrDefault(v => v.Name == request.Name &&
                             v.Level == request.Level &&
                             v.Description == request.Description &&
-                            v.Units == request.Units);
+                            v.Units == request.Units &&
+                            v.ComparisonOutput == request.ComparisonOutput);
 
         if (variable != null)
             return Ok(variable.Id);
@@ -288,7 +289,8 @@ public class ObservationsController : ControllerBase
             Description = request.Description,
             Units = request.Units,
             DatasetId = datasetId,
-            Level = request.Level
+            Level = request.Level,
+            ComparisonOutput = request.ComparisonOutput
         };
 
         dataset.Variables.Add(variable);
@@ -319,6 +321,7 @@ public class ObservationsController : ControllerBase
         {
             Name = request.Name,
             Description = request.Description,
+            ComparisonLayer = request.ComparisonLayer,
             Variable = variable
         };
 

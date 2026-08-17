@@ -177,7 +177,8 @@ public class ImportHandler
                 Quantity quantity = await this.parser.ParseOutputFileAsync(outputFile);
 
                 // Add it to the dataset.
-                await apiClient.AddQuantityAsync(datasetId, quantity);
+                await apiClient.AddQuantityAsync(
+                    datasetId, quantity, resolver.GetFileType(Path.GetFileName(outputFile)));
             }
             return new ImportResult(groupId, [datasetId]);
         }
@@ -286,7 +287,8 @@ public class ImportHandler
                     Quantity quantity = await parser.ParseOutputFileAsync(outputFile);
 
                     // Add it to the dataset.
-                    await apiClient.AddQuantityAsync(datasetId, quantity);
+                    await apiClient.AddQuantityAsync(
+                        datasetId, quantity, resolver.GetFileType(Path.GetFileName(outputFile)));
                 }
             }
             return new ImportResult(groupId, datasetIds);

@@ -528,6 +528,10 @@ namespace Dave.Benchmarks.Web.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ComparisonOutput")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
                     b.Property<int>("DatasetId")
                         .HasColumnType("int");
 
@@ -560,6 +564,10 @@ namespace Dave.Benchmarks.Web.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ComparisonLayer")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
 
                     b.Property<string>("Description")
                         .IsRequired()

@@ -80,7 +80,7 @@ public interface IApiClient
     /// <param name="datasetId">ID of the dataset.</param>
     /// <param name="quantity">The quantity to be added.</param>
     /// <param name="dryRun">HTTP request will be performed iff this is false.</param>
-    Task AddQuantityAsync(int datasetId, Quantity quantity);
+    Task AddQuantityAsync(int datasetId, Quantity quantity, string? comparisonOutput = null);
 
     /// <summary>
     /// Flag a group as complete.

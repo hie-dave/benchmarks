@@ -397,10 +397,10 @@ public class EvaluationEngineTests
     }
 
     [Theory]
-    [InlineData(AggregationLevel.Gridcell)]
-    [InlineData(AggregationLevel.Stand)]
-    [InlineData(AggregationLevel.Patch)]
-    public async Task ExecuteAsync_LoadsAndMatchesByAggregationLevel(AggregationLevel level)
+    [InlineData(AggregationLevel.Gridcell, true)]
+    [InlineData(AggregationLevel.Stand, false)]
+    [InlineData(AggregationLevel.Patch, false)]
+    public async Task ExecuteAsync_OnlyMatchesGridcellVariables(AggregationLevel level, bool expectedResult)
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
@@ -422,14 +422,44 @@ public class EvaluationEngineTests
         EvaluationEngine engine = new(db, Mock.Of<ILogger<EvaluationEngine>>());
         await engine.ExecuteAsync(run.Id);
 
-        EvaluationResult result = db.EvaluationResults
+        List<EvaluationResult> results = db.EvaluationResults
             .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunDatasetId == run.Id);
-        Assert.Contains(result.Metrics, m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
+            .Where(r => r.EvaluationRunDatasetId == run.Id)
+            .ToList();
+        if (expectedResult)
+            Assert.Contains(results.Single().Metrics,
+                m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
+        else
+            Assert.Empty(results);
     }
 
     [Fact]
-    public async Task ExecuteAsync_IndividualLevel_UsesIndividualNumberInKey()
+    public async Task ExecuteAsync_ComparisonTargetMatchesDespiteDifferentDisplayMetadata()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        PredictionDataset candidate = EvaluationSeed.CreatePredictionDataset(db);
+        ObservationDataset observation = EvaluationSeed.CreateObservationDataset(db, MatchingStrategy.ExactMatch);
+        (Variable candidateVariable, VariableLayer candidateLayer) = EvaluationSeed.AddVariableLayer(
+            db, candidate, variableName: "Prediction GPP", units: "prediction-units", layerName: "model-total");
+        (Variable observationVariable, VariableLayer observationLayer) = EvaluationSeed.AddVariableLayer(
+            db, observation, variableName: "Observed flux", units: "observation-units", layerName: "mean");
+        candidateVariable.ComparisonOutput = observationVariable.ComparisonOutput = "file_dave_dgpp";
+        candidateLayer.ComparisonLayer = observationLayer.ComparisonLayer = "total";
+        db.SaveChanges();
+        DateTime timestamp = new(2025, 1, 1);
+        EvaluationSeed.AddGridcellDatum(db, candidateVariable, candidateLayer, timestamp, -33, 151, 2.0);
+        EvaluationSeed.AddGridcellDatum(db, observationVariable, observationLayer, timestamp, -33, 151, 1.0);
+        EvaluationRun run = EvaluationSeed.CreateRun(db, candidate, baselineDatasetId: null);
+        db.ChangeTracker.Clear();
+
+        await new EvaluationEngine(db, Mock.Of<ILogger<EvaluationEngine>>()).ExecuteAsync(run.Id);
+
+        Assert.Single(db.EvaluationResults.Where(r => r.EvaluationRunDatasetId == run.Id));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_IndividualLevel_IsNotCompared()
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
         using BenchmarksDbContext db = fixture.CreateContext();
@@ -456,10 +486,7 @@ public class EvaluationEngineTests
         EvaluationEngine engine = new(db, Mock.Of<ILogger<EvaluationEngine>>());
         await engine.ExecuteAsync(run.Id);
 
-        EvaluationResult result = db.EvaluationResults
-            .Include(r => r.Metrics)
-            .Single(r => r.EvaluationRunDatasetId == run.Id);
-        Assert.Contains(result.Metrics, m => m.MetricType == "n" && Math.Abs(m.Value - 1.0) < 0.001);
+        Assert.Empty(db.EvaluationResults.Where(r => r.EvaluationRunDatasetId == run.Id));
     }
 
     private static void AddDatumForLevel(

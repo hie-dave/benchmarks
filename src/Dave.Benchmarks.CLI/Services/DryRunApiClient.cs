@@ -34,7 +34,7 @@ public class DryRunApiClient : IApiClient
     }
 
     /// <inheritdoc />
-    public Task AddQuantityAsync(int datasetId, Quantity quantity)
+    public Task AddQuantityAsync(int datasetId, Quantity quantity, string? comparisonOutput = null)
     {
         logger.LogInformation("[DRY RUN] Would add quantity {Quantity} to dataset {DatasetId}", quantity.Name, datasetId);
         return Task.CompletedTask;

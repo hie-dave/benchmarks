@@ -7,7 +7,9 @@ using Dave.Benchmarks.CLI.Services;
 using Dave.Benchmarks.Core.Models.Entities;
 using Dave.Benchmarks.Core.Models.Importer;
 using Dave.Benchmarks.Core.Services;
+using LpjGuess.Core.Models;
 using LpjGuess.Core.Models.Entities;
+using LpjGuess.Core.Services;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -85,18 +87,20 @@ public class ObservationImportHandler
                              .Where(v => siteVariables == null || siteVariables[datasetName].Contains((v.Name, v.Layer))))
                 {
                     AggregationLevel level = Enum.Parse<AggregationLevel>(variable.Level, true);
-                    int variableId = await api.CreateObservationVariableAsync(datasetId, new CreateVariableRequest
-                    {
-                        Name = variable.Name,
-                        Description = variable.Description,
-                        Units = variable.Units,
-                        Level = level
-                    }, cancellationToken);
+                int variableId = await api.CreateObservationVariableAsync(datasetId, new CreateVariableRequest
+                {
+                    Name = variable.Name,
+                    Description = variable.Description,
+                    Units = variable.Units,
+                    Level = level,
+                    ComparisonOutput = variable.Target?.Output
+                }, cancellationToken);
                     int layerId = await api.CreateObservationLayerAsync(variableId, new CreateLayerRequest
                     {
-                        Name = variable.Layer,
-                        Description = variable.Description
-                    }, cancellationToken);
+                    Name = variable.Layer,
+                    Description = variable.Description,
+                    ComparisonLayer = variable.Target?.Layer
+                }, cancellationToken);
                     layerIds[(datasetName, variable.Name, variable.Layer)] = layerId;
                 }
             }
@@ -196,9 +200,14 @@ public class ObservationImportHandler
                 throw new InvalidDataException("Every file requires path, date_column and temporal_resolution");
             if (!File.Exists(Path.Combine(baseDirectory, file.Path))) throw new FileNotFoundException(file.Path);
             if (file.Variables.Count == 0) throw new InvalidDataException($"{file.Path} declares no variables");
-            if (file.Variables.Any(v => string.IsNullOrWhiteSpace(v.Column) || string.IsNullOrWhiteSpace(v.Name) ||
-                                        string.IsNullOrWhiteSpace(v.Units) || string.IsNullOrWhiteSpace(v.Layer)))
-                throw new InvalidDataException($"Every variable in {file.Path} requires column, name, units and layer");
+            if (file.Variables.Any(v => string.IsNullOrWhiteSpace(v.Column)))
+                throw new InvalidDataException($"Every variable in {file.Path} requires column");
+            foreach (ObservationVariableManifest variable in file.Variables)
+                ResolveTarget(variable, file);
+            if (file.Variables.Any(v => string.IsNullOrWhiteSpace(v.Name) || string.IsNullOrWhiteSpace(v.Units) ||
+                                        string.IsNullOrWhiteSpace(v.Layer)))
+                throw new InvalidDataException(
+                    $"Every untargeted variable in {file.Path} requires name, units and layer");
             if (file.Variables.Any(v => !v.Level.Equals("gridcell", StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidDataException("The initial observation CSV importer supports gridcell-level variables only");
             if (kind == DatasetGroupKind.ObservationSite && string.IsNullOrWhiteSpace(file.SiteColumn))
@@ -216,6 +225,42 @@ public class ObservationImportHandler
                 throw new InvalidDataException(
                     $"Variable {variables.Key.Name}/{variables.Key.Layer} has conflicting definitions");
         }
+    }
+
+    private static void ResolveTarget(ObservationVariableManifest variable, ObservationFileManifest file)
+    {
+        if (variable.Target == null) return;
+        if (string.IsNullOrWhiteSpace(variable.Target.Output) || string.IsNullOrWhiteSpace(variable.Target.Layer))
+            throw new InvalidDataException($"Target for {variable.Column} requires output and layer");
+
+        OutputFileMetadata metadata;
+        try { metadata = OutputFileDefinitions.GetMetadata(variable.Target.Output); }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidDataException($"Unknown target output {variable.Target.Output}", ex);
+        }
+        if (metadata.Level != AggregationLevel.Gridcell)
+            throw new InvalidDataException($"Observation target {variable.Target.Output} is not gridcell-level");
+        if (!metadata.Layers.IsDataLayer(variable.Target.Layer))
+            throw new InvalidDataException(
+                $"Layer {variable.Target.Layer} is not valid for target {variable.Target.Output}");
+
+        string canonicalUnits = metadata.Layers.GetUnits(variable.Target.Layer).Name;
+        if (!string.IsNullOrWhiteSpace(variable.Units) && variable.Units != canonicalUnits)
+            throw new InvalidDataException(
+                $"Units for {variable.Column} must be {canonicalUnits} for target " +
+                $"{variable.Target.Output}/{variable.Target.Layer}; got {variable.Units}");
+        if (!Enum.TryParse(file.TemporalResolution, true, out TemporalResolution resolution) ||
+            resolution != metadata.TemporalResolution)
+            throw new InvalidDataException(
+                $"Temporal resolution for {variable.Column} must be {metadata.TemporalResolution} " +
+                $"for target {variable.Target.Output}");
+
+        variable.Name = metadata.Name;
+        if (string.IsNullOrWhiteSpace(variable.Description)) variable.Description = metadata.Description;
+        variable.Units = canonicalUnits;
+        variable.Level = metadata.Level.ToString();
+        variable.Layer = variable.Target.Layer;
     }
 
     private static IReadOnlyDictionary<string, HashSet<(string Name, string Layer)>> DiscoverSiteVariables(

@@ -4,3 +4,4 @@ wwwroot/
 coverage/
 TestResults/
 .vscode/.cli-debug.env
+data

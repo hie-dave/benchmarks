@@ -32,4 +32,11 @@ public class ObservationVariableManifest
     public string Units { get; set; } = string.Empty;
     public string Level { get; set; } = "gridcell";
     public string Layer { get; set; } = "mean";
+    public ObservationTargetManifest? Target { get; set; }
+}
+
+public class ObservationTargetManifest
+{
+    public string Output { get; set; } = string.Empty;
+    public string Layer { get; set; } = string.Empty;
 }

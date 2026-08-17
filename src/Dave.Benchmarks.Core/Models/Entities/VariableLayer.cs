@@ -20,6 +20,9 @@ public class VariableLayer
     /// </summary>
     public string Description { get; set; } = string.Empty;
 
+    /// <summary>The stable output-layer identity used for comparisons.</summary>
+    public string? ComparisonLayer { get; set; }
+
     // Navigation properties
 
     /// <summary>

@@ -196,6 +196,7 @@ public class PredictionsController : ControllerBase
             {
                 Name = layer.Name,
                 Description = layer.Name, // TODO: add layer-level descriptions?
+                ComparisonLayer = layer.Name,
                 Variable = variable  // Use navigation property instead of ID
             };
 
@@ -326,7 +327,8 @@ public class PredictionsController : ControllerBase
             .FirstOrDefault(v => v.Name == request.Name &&
                             v.Level == request.Level &&
                             v.Description == request.Description &&
-                            v.Units == request.Units);
+                            v.Units == request.Units &&
+                            v.ComparisonOutput == request.ComparisonOutput);
 
         if (variable != null)
             return Ok(variable.Id);
@@ -338,7 +340,8 @@ public class PredictionsController : ControllerBase
             Description = request.Description,
             Units = request.Units,
             DatasetId = datasetId,
-            Level = request.Level
+            Level = request.Level,
+            ComparisonOutput = request.ComparisonOutput
         };
 
         dataset.Variables.Add(variable);
@@ -362,6 +365,7 @@ public class PredictionsController : ControllerBase
         {
             Name = request.Name,
             Description = request.Description,
+            ComparisonLayer = request.ComparisonLayer,
             Variable = variable
         };
 

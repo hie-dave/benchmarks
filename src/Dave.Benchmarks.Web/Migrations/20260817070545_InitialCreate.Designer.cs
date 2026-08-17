@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dave.Benchmarks.Web.Migrations
 {
     [DbContext(typeof(BenchmarksDbContext))]
-    [Migration("20260817042149_InitialCreate")]
+    [Migration("20260817070545_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -531,6 +531,10 @@ namespace Dave.Benchmarks.Web.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ComparisonOutput")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
                     b.Property<int>("DatasetId")
                         .HasColumnType("int");
 
@@ -563,6 +567,10 @@ namespace Dave.Benchmarks.Web.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ComparisonLayer")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
 
                     b.Property<string>("Description")
                         .IsRequired()

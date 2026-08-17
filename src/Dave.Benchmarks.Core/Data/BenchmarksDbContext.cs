@@ -125,6 +125,14 @@ public class BenchmarksDbContext : DbContext
         modelBuilder.Entity<ObservationDataset>()
             .HasIndex(d => d.Active);
 
+        modelBuilder.Entity<Variable>()
+            .Property(v => v.ComparisonOutput)
+            .HasMaxLength(128);
+
+        modelBuilder.Entity<VariableLayer>()
+            .Property(l => l.ComparisonLayer)
+            .HasMaxLength(128);
+
         modelBuilder.Entity<DatasetGroup>(entity =>
         {
             entity.Property(g => g.Name).HasMaxLength(128).IsRequired();

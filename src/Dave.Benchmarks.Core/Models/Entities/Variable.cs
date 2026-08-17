@@ -32,6 +32,9 @@ public class Variable
     /// </summary>
     public AggregationLevel Level { get; set; }
 
+    /// <summary>The stable model output definition used for comparisons.</summary>
+    public string? ComparisonOutput { get; set; }
+
     // Navigation properties
 
     /// <summary>

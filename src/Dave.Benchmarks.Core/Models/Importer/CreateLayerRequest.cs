@@ -14,4 +14,7 @@ public class CreateLayerRequest
     /// Description of the layer.
     /// </summary>
     public string Description { get; set; } = null!;
+
+    /// <summary>Stable output-layer key used for evaluation matching.</summary>
+    public string? ComparisonLayer { get; set; }
 }

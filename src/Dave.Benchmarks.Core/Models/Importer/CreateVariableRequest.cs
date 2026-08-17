@@ -27,6 +27,9 @@ public class CreateVariableRequest
     /// </summary>
     public string Units { get; set; } = null!;
 
+    /// <summary>Stable output definition key used for evaluation matching.</summary>
+    public string? ComparisonOutput { get; set; }
+
     /// <summary>
     /// For individual-level outputs, maps individual numbers to their PFT names.
     /// Individual numbers are unique within a dataset (model run).

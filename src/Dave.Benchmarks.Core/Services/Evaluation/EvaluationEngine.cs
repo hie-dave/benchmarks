@@ -157,35 +157,29 @@ public class EvaluationEngine : IEvaluationEngine
 
             foreach (Variable candidateVar in candidate.Variables)
             {
+                if (candidateVar.Level != AggregationLevel.Gridcell)
+                    continue;
+
                 // Could an observation dataset have multiple variables which
                 // match? In practice, probably not.
                 Variable? observationVar = observationDataset.Variables.FirstOrDefault(v =>
-                    v.Name == candidateVar.Name &&
-                    v.Level == candidateVar.Level &&
-                    v.Units == candidateVar.Units);
+                    VariablesComparable(candidateVar, v));
 
                 if (observationVar == null)
                     continue;
 
                 Variable? baselineVar = baseline?.Variables.FirstOrDefault(v =>
-                    v.Name == candidateVar.Name &&
-                    // Baseline is a prediction dataset, so its description
-                    // could and should match the candidate's as well.
-                    // TODO: is this brittle wrt description? Should probably
-                    // rethink this.
-                    v.Description == candidateVar.Description &&
-                    v.Level == candidateVar.Level &&
-                    v.Units == candidateVar.Units);
+                    VariablesComparable(candidateVar, v));
 
                 foreach (VariableLayer candidateLayer in candidateVar.Layers)
                 {
                     VariableLayer? observationLayer = observationVar.Layers
-                        .FirstOrDefault(l => l.Name.Equals(candidateLayer.Name, StringComparison.InvariantCultureIgnoreCase));
+                        .FirstOrDefault(l => LayersComparable(candidateLayer, l));
                     if (observationLayer == null)
                         continue;
 
                     VariableLayer? baselineLayer = baselineVar?.Layers
-                        .FirstOrDefault(l => l.Name.Equals(candidateLayer.Name, StringComparison.InvariantCultureIgnoreCase));
+                        .FirstOrDefault(l => LayersComparable(candidateLayer, l));
 
                     EvaluationResult? baselineResult = baseline == null ? null : baselineRun?.Datasets
                         .FirstOrDefault(d => d.CandidateDatasetId == baseline.Id)?.Results
@@ -244,6 +238,24 @@ public class EvaluationEngine : IEvaluationEngine
             }
         }
         return new Results(pass, results);
+    }
+
+    private static bool VariablesComparable(Variable left, Variable right)
+    {
+        if (left.Level != AggregationLevel.Gridcell || right.Level != AggregationLevel.Gridcell)
+            return false;
+        if (!string.IsNullOrWhiteSpace(left.ComparisonOutput) &&
+            !string.IsNullOrWhiteSpace(right.ComparisonOutput))
+            return left.ComparisonOutput == right.ComparisonOutput;
+        return left.Name == right.Name && left.Units == right.Units;
+    }
+
+    private static bool LayersComparable(VariableLayer left, VariableLayer right)
+    {
+        if (!string.IsNullOrWhiteSpace(left.ComparisonLayer) &&
+            !string.IsNullOrWhiteSpace(right.ComparisonLayer))
+            return left.ComparisonLayer == right.ComparisonLayer;
+        return left.Name.Equals(right.Name, StringComparison.InvariantCultureIgnoreCase);
     }
 
     private static bool ObservationDatasetApplies(ObservationDataset observation, PredictionDataset candidate)

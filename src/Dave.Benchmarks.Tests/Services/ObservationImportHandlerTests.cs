@@ -90,9 +90,10 @@ public class ObservationImportHandlerTests
                     temporal_resolution: daily
                     variables:
                       - column: gpp
-                        name: gpp
-                        units: kgC/m2/day
-                        layer: total
+                        units: gC/m2/day
+                        target:
+                          output: file_dave_dgpp
+                          layer: total
                 """);
 
             Mock<IApiClient> api = new();
@@ -125,6 +126,15 @@ public class ObservationImportHandlerTests
                 It.IsAny<int>(),
                 It.Is<AppendObservationDataRequest>(r => r.DataPoints.Count == 1 &&
                     r.DataPoints[0].Longitude == null && r.DataPoints[0].Latitude == null),
+                It.IsAny<CancellationToken>()), Times.Exactly(2));
+            api.Verify(a => a.CreateObservationVariableAsync(
+                It.IsAny<int>(), It.Is<CreateVariableRequest>(r =>
+                    r.Name == "GPP" && r.Units == "gC/m2/day" &&
+                    r.Level == LpjGuess.Core.Models.Entities.AggregationLevel.Gridcell &&
+                    r.ComparisonOutput == "file_dave_dgpp"), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            api.Verify(a => a.CreateObservationLayerAsync(
+                It.IsAny<int>(), It.Is<CreateLayerRequest>(r =>
+                    r.Name == "total" && r.ComparisonLayer == "total"),
                 It.IsAny<CancellationToken>()), Times.Exactly(2));
             api.Verify(a => a.CompleteObservationGroupAsync(10, It.IsAny<CancellationToken>()), Times.Once);
             api.Verify(a => a.ActivateObservationGroupAsync(10, It.IsAny<CancellationToken>()), Times.Once);

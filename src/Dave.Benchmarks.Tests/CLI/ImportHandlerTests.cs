@@ -85,6 +85,7 @@ public class ImportHandlerTests
         git.Setup(x => x.GetRepositoryInfo(It.IsAny<string>())).Returns(BuildRepositoryInfo());
         instructionFactory.Setup(x => x.Create("run.ins")).Returns(instructionParser.Object);
         resolver.Setup(x => x.BuildLookupTable(instructionParser.Object));
+        resolver.Setup(x => x.GetFileType("fresh.out")).Returns("file_dave_dgpp");
 
         fileSystem
             .Setup(x => x.EnumerateFiles("/tmp/out", "*.out", SearchOption.TopDirectoryOnly))
@@ -125,7 +126,7 @@ public class ImportHandlerTests
 
         parser.Verify(x => x.ParseOutputFileAsync(freshFile, default), Times.Once);
         parser.Verify(x => x.ParseOutputFileAsync(staleFile, default), Times.Never);
-        api.Verify(x => x.AddQuantityAsync(20, quantity), Times.Once);
+        api.Verify(x => x.AddQuantityAsync(20, quantity, "file_dave_dgpp"), Times.Once);
     }
 
     [Fact]
@@ -159,7 +160,8 @@ public class ImportHandlerTests
                 It.IsAny<string>(),
                 It.IsAny<int?>()))
             .ReturnsAsync(100);
-        api.Setup(x => x.AddQuantityAsync(100, It.IsAny<Quantity>())).ThrowsAsync(new InvalidOperationException("import failed"));
+        api.Setup(x => x.AddQuantityAsync(100, It.IsAny<Quantity>(), It.IsAny<string?>()))
+            .ThrowsAsync(new InvalidOperationException("import failed"));
 
         GriddedOptions options = new()
         {
@@ -255,7 +257,7 @@ public class ImportHandlerTests
                 "{}",
                 11),
             Times.Once);
-        api.Verify(x => x.AddQuantityAsync(21, quantity), Times.Once);
+        api.Verify(x => x.AddQuantityAsync(21, quantity, It.IsAny<string?>()), Times.Once);
         parser.Verify(x => x.ParseOutputFileAsync(staleOut, default), Times.Never);
     }
 
@@ -326,7 +328,7 @@ public class ImportHandlerTests
             Times.Once);
         parser.Verify(x => x.ParseOutputFileAsync(freshOut, default), Times.Once);
         parser.Verify(x => x.ParseOutputFileAsync(staleOut, default), Times.Never);
-        api.Verify(x => x.AddQuantityAsync(60, quantity), Times.Once);
+        api.Verify(x => x.AddQuantityAsync(60, quantity, It.IsAny<string?>()), Times.Once);
     }
 
     [Fact]
@@ -488,7 +490,8 @@ public class ImportHandlerTests
                 It.IsAny<string>(),
                 It.IsAny<int?>()))
             .ReturnsAsync(77);
-        api.Setup(x => x.AddQuantityAsync(77, It.IsAny<Quantity>())).ThrowsAsync(new InvalidOperationException("fail"));
+        api.Setup(x => x.AddQuantityAsync(77, It.IsAny<Quantity>(), It.IsAny<string?>()))
+            .ThrowsAsync(new InvalidOperationException("fail"));
 
         SiteOptions options = new()
         {

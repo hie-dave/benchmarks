@@ -244,11 +244,10 @@ files:
     temporal_resolution: daily
     variables:
       - column: gpp
-        name: gpp
-        description: Gross primary productivity
-        units: kgC/m2/day
-        level: gridcell
-        layer: total
+        units: gC/m2/day
+        target:
+          output: file_dave_dgpp
+          layer: total
 ```
 
 Import and activate it with:
@@ -258,8 +257,37 @@ dotnet run --project src/Dave.Benchmarks.CLI -- \
   observations --manifest observations.yaml --activate
 ```
 
+Partial observation imports are retained by default for diagnosis. During
+development of a new source, add `--cleanup-on-failure` to delete the release
+and all datasets created for it if any import or activation step fails. An
+active observation release is never deleted automatically.
+
 Input may be plain CSV or gzip-compressed CSV (`.gz`). Gridded manifests use
 `kind: gridded`, declare `longitude_column` and `latitude_column`, and select
 `matching_strategy: exact` or `nearest` (with `max_distance_km` for nearest).
 The initial importer supports gridcell-level variables and requires all files
-in one release to use the same temporal resolution.
+in one release to use the same temporal resolution. A `target` maps an arbitrary
+source column to a model output definition and layer. The importer derives the
+canonical variable name, description, aggregation level, units, and layer from
+that definition and rejects incompatible declared units or temporal resolution.
+
+### Browsing results
+
+The web navigation separates **Predictions** and **Observations** while using
+the same dataset, variable, and tabular-data explorer. Observation pages are
+read-only in normal deployments. Dataset/release delete controls are rendered
+only in Development; their endpoints still require a protected GitLab token in
+non-development environments.
+
+The **Evaluations** page groups benchmark submissions and runs by GitLab merge
+request. Selecting an MR shows its tested commits, pipelines, and evaluation
+attempts. A run detail page shows its aggregate outcome, per-dataset outcome,
+baseline, observation comparisons, and stored metrics.
+
+The **Timeseries** page can overlay multiple dataset/variable selections and
+multiple layers from each selection. When its first dataset is site-level,
+an enabled-by-default option restricts additional datasets to the same
+`SimulationId`; disabling it permits cross-site comparisons. All traces are
+restricted to timestamps shared by every selected trace. The
+**Relationships** page provides a site-level X-versus-Y view with one arbitrary
+X series and one or more Y series, joining every X/Y pair by timestamp.

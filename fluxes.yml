@@ -4,13 +4,33 @@ source: OzFlux
 description: Data from Flux Towers
 
 files:
-  - path: data/gpp_solo.csv.gz
+  - path: data/flux/gpp_solo.csv.gz
     date_column: date
     site_column: site
     temporal_resolution: daily
     variables:
       - column: gpp_solo
-        name: gpp
-        units: gC m-2 day-1
-        level: gridcell
-        layer: mean
+        units: gC/m2/day
+        target:
+          output: file_dave_dgpp
+          layer: total
+  - path: data/flux/er_solo.csv.gz
+    date_column: date
+    site_column: site
+    temporal_resolution: daily
+    variables:
+      - column: er_solo
+        units: gC/m2/day
+        target:
+          output: file_dave_der
+          layer: total
+  - path: data/flux/nee_solo.csv.gz
+    date_column: date
+    site_column: site
+    temporal_resolution: daily
+    variables:
+      - column: nee_solo
+        units: gC/m2/day
+        target:
+          output: file_dave_dnee
+          layer: nee

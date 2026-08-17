@@ -290,6 +290,8 @@ namespace Dave.Benchmarks.Web.Migrations
                     Units = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Level = table.Column<int>(type: "int", nullable: false),
+                    ComparisonOutput = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     DatasetId = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
@@ -313,6 +315,8 @@ namespace Dave.Benchmarks.Web.Migrations
                     Name = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Description = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ComparisonLayer = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     VariableId = table.Column<int>(type: "int", nullable: false)
                 },

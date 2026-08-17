@@ -163,7 +163,7 @@ public class ProductionApiClient : IApiClient
     }
 
     /// <inheritdoc />
-    public async Task AddQuantityAsync(int datasetId, Quantity quantity)
+    public async Task AddQuantityAsync(int datasetId, Quantity quantity, string? comparisonOutput = null)
     {
         // Create the variable first
         CreateVariableRequest createRequest = new CreateVariableRequest()
@@ -172,6 +172,7 @@ public class ProductionApiClient : IApiClient
             Description = quantity.Description,
             Level = quantity.Level,
             Units = quantity.Layers.First().Unit.Name,
+            ComparisonOutput = comparisonOutput,
             IndividualPfts = quantity.IndividualPfts
         };
 
@@ -184,7 +185,8 @@ public class ProductionApiClient : IApiClient
             CreateLayerRequest layerRequest = new CreateLayerRequest
             {
                 Name = layer.Name,
-                Description = layer.Name // TODO: Add layer-level descriptions?
+                Description = layer.Name, // TODO: Add layer-level descriptions?
+                ComparisonLayer = layer.Name
             };
 
             int layerId = await CreateLayerAsync(variableId, layerRequest);
