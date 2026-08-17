@@ -1,0 +1,145 @@
+@using System.Text.Json
+@model Dave.Benchmarks.Web.Models.EvaluationComparisonViewModel
+@{
+    ViewData["Title"] = $"{Model.Site} · {Model.CandidateVariable}";
+    ViewData["FullWidth"] = true;
+    var chartData = JsonSerializer.Serialize(new
+    {
+        candidate = Model.CandidatePoints,
+        observation = Model.ObservationPoints,
+        paired = Model.PairedPoints
+    }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="mb-3">
+    <a asp-action="Details" asp-route-id="@Model.EvaluationRunId">← Back to evaluation #@Model.EvaluationRunId</a>
+</div>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h2 class="mb-1">@Model.Site · @Model.CandidateVariable</h2>
+        <div class="text-muted">
+            Prediction @Model.CandidateLayer against observation @Model.ObservationVariable / @Model.ObservationLayer
+            @if (!string.IsNullOrWhiteSpace(Model.Units)) { <span> · @Model.Units</span> }
+        </div>
+    </div>
+    <span class="badge text-bg-light border fs-6">@Model.PairedPoints.Count paired points</span>
+</div>
+
+@if (Model.PairedPoints.Count == 0)
+{
+    <div class="alert alert-warning">These series currently have no timestamps in common.</div>
+}
+
+<div class="card mb-4">
+    <div class="card-header"><strong>Full timeseries</strong></div>
+    <div class="card-body"><div id="timeseriesPlot" style="height: 520px"></div></div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <strong>Predicted versus observed</strong>
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="equalAxes">
+            <label class="form-check-label" for="equalAxes">Use equal axis limits</label>
+        </div>
+    </div>
+    <div class="card-body"><div id="relationshipPlot" style="height: 560px"></div></div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header"><strong>Mean annual cycle</strong></div>
+    <div class="card-body">
+        <p class="small text-muted">Mean value for each calendar day across all available years.</p>
+        <div id="annualPlot" style="height: 520px"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script>
+        (() => {
+            const data = @Html.Raw(chartData);
+            const units = @Html.Raw(JsonSerializer.Serialize(Model.Units));
+            const transparent = 'rgba(0,0,0,0)';
+            const styles = getComputedStyle(document.body);
+            const textColor = styles.color;
+            const gridColor = getComputedStyle(document.documentElement)
+                .getPropertyValue('--bs-border-color').trim() || 'rgba(128,128,128,0.3)';
+            const baseLayout = {
+                paper_bgcolor: transparent, plot_bgcolor: transparent,
+                font: { color: textColor }, margin: { t: 25, r: 25, b: 60, l: 70 },
+                legend: { orientation: 'h', y: 1.12 },
+                xaxis: { gridcolor: gridColor }, yaxis: { gridcolor: gridColor }
+            };
+            const seriesTrace = (points, name, color) => ({
+                x: points.map(point => point.timestamp), y: points.map(point => point.value),
+                name, type: 'scatter', mode: 'lines', line: { color }
+            });
+
+            Plotly.newPlot('timeseriesPlot', [
+                seriesTrace(data.candidate, 'Predicted', '#0d6efd'),
+                seriesTrace(data.observation, 'Observed', '#dc3545')
+            ], {
+                ...baseLayout,
+                xaxis: { ...baseLayout.xaxis, title: 'Date', type: 'date' },
+                yaxis: { ...baseLayout.yaxis, title: units }
+            }, { responsive: true, displaylogo: false });
+
+            function relationshipLayout(equalAxes) {
+                const values = data.paired.flatMap(point => [point.observed, point.predicted]);
+                let range;
+                if (values.length) {
+                    const min = Math.min(...values), max = Math.max(...values);
+                    const padding = (max - min || Math.abs(max) || 1) * 0.05;
+                    range = [min - padding, max + padding];
+                }
+                return {
+                    ...baseLayout, showlegend: false,
+                    xaxis: { ...baseLayout.xaxis, title: `Observed (${units})`, range: equalAxes ? range : undefined },
+                    yaxis: { ...baseLayout.yaxis, title: `Predicted (${units})`, range: equalAxes ? range : undefined },
+                    shapes: values.length ? [{
+                        type: 'line', x0: range[0], y0: range[0], x1: range[1], y1: range[1],
+                        line: { color: '#6c757d', dash: 'dash', width: 2 }
+                    }] : []
+                };
+            }
+            function drawRelationship() {
+                Plotly.react('relationshipPlot', [{
+                    x: data.paired.map(point => point.observed),
+                    y: data.paired.map(point => point.predicted),
+                    text: data.paired.map(point => point.timestamp),
+                    type: 'scatter', mode: 'markers', marker: { color: '#0d6efd', opacity: 0.7 },
+                    hovertemplate: '%{text}<br>Observed %{x}<br>Predicted %{y}<extra></extra>'
+                }], relationshipLayout(document.getElementById('equalAxes').checked),
+                    { responsive: true, displaylogo: false });
+            }
+            document.getElementById('equalAxes').addEventListener('change', drawRelationship);
+            drawRelationship();
+
+            function annualMean(points) {
+                const groups = new Map();
+                points.forEach(point => {
+                    const date = new Date(point.timestamp);
+                    const key = `${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(point.value);
+                });
+                return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, values]) => ({
+                    date: `2000-${key}T00:00:00Z`,
+                    value: values.reduce((sum, value) => sum + value, 0) / values.length
+                }));
+            }
+            const candidateAnnual = annualMean(data.candidate);
+            const observationAnnual = annualMean(data.observation);
+            Plotly.newPlot('annualPlot', [
+                seriesTrace(candidateAnnual.map(point => ({ timestamp: point.date, value: point.value })), 'Predicted', '#0d6efd'),
+                seriesTrace(observationAnnual.map(point => ({ timestamp: point.date, value: point.value })), 'Observed', '#dc3545')
+            ], {
+                ...baseLayout,
+                xaxis: { ...baseLayout.xaxis, title: 'Month', type: 'date', tickformat: '%b' },
+                yaxis: { ...baseLayout.yaxis, title: units }
+            }, { responsive: true, displaylogo: false });
+        })();
+    </script>
+}

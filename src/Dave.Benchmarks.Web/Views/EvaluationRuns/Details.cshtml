@@ -1,13 +1,60 @@
 @using Dave.Benchmarks.Core.Models.Entities
+@using System.Text.Json
 @model Dave.Benchmarks.Web.Models.EvaluationRunDetailsViewModel
 
 @{
     ViewData["Title"] = $"Evaluation #{Model.Id}";
+    var overview = JsonSerializer.Serialize(Model.Datasets.SelectMany(dataset => dataset.Results.Select(result => new
+    {
+        site = dataset.CandidateName,
+        quantity = $"{result.CandidateVariable} / {result.CandidateLayer}",
+        resultId = result.Id,
+        metrics = result.Metrics.ToDictionary(metric => metric.Type, metric => metric.Value)
+    })));
 }
 
 <div class="mb-3">
     <a asp-action="Index" asp-route-projectId="@Model.ProjectId" asp-route-mergeRequestId="@Model.MergeRequestId">← Back to MR !@Model.MergeRequestId</a>
 </div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body">
+        <div class="text-muted small">Sites</div><div class="fs-4 fw-semibold">@Model.Datasets.Count</div>
+    </div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body">
+        <div class="text-muted small">Comparisons</div><div class="fs-4 fw-semibold">@Model.ComparisonCount</div>
+    </div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body">
+        <div class="text-muted small">Without baseline</div><div class="fs-4 fw-semibold">@Model.DatasetCountWithoutBaseline</div>
+        @if (Model.Passed == true && Model.DatasetCountWithoutBaseline > 0)
+        {
+            <div class="small text-muted">These comparisons pass because no baseline exists yet.</div>
+        }
+    </div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body">
+        <div class="text-muted small">Unchanged from baseline</div><div class="fs-4 fw-semibold">@Model.UnchangedComparisonCount</div>
+        <div class="small text-muted">Comparisons whose stored metrics are all unchanged.</div>
+    </div></div></div>
+</div>
+
+@if (Model.ComparisonCount > 0 && Model.MetricTypes.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div><strong>At-a-glance metrics</strong><div class="small text-muted">Sites by evaluated quantity</div></div>
+            <div class="d-flex align-items-center gap-2">
+                <label for="overviewMetric" class="form-label mb-0 small">Metric</label>
+                <select id="overviewMetric" class="form-select form-select-sm" style="width: auto">
+                    @foreach (string metric in Model.MetricTypes)
+                    {
+                        <option value="@metric">@metric</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="card-body p-0"><div class="table-responsive" id="metricOverview"></div></div>
+    </div>
+}
 
 <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
@@ -83,12 +130,19 @@ else
                                     @foreach (var result in dataset.Results)
                                     {
                                         <tr>
-                                            <td><strong>@result.CandidateVariable</strong><br /><span class="text-muted small">@result.CandidateLayer</span></td>
+                                            <td>
+                                                <a asp-action="Comparison" asp-route-id="@result.Id"><strong>@result.CandidateVariable</strong></a>
+                                                <br /><span class="text-muted small">@result.CandidateLayer</span>
+                                                @if (result.MetricsUnchangedFromBaseline == true)
+                                                {
+                                                    <br /><span class="badge text-bg-secondary">Unchanged</span>
+                                                }
+                                            </td>
                                             <td><strong>@result.ObservationDataset / @result.ObservationVariable</strong><br /><span class="text-muted small">@result.ObservationLayer</span></td>
                                             <td>
                                                 @foreach (var metric in result.Metrics)
                                                 {
-                                                    <span class="badge text-bg-light border me-1"><strong>@metric.Type</strong> @FormatMetric(metric.Value)</span>
+                                                    <span class="badge text-bg-light border me-1"><strong>@metric.Type</strong> @FormatMetric(metric.Type, metric.Value)</span>
                                                 }
                                             </td>
                                         </tr>
@@ -104,11 +158,50 @@ else
     </div>
 }
 
+@section Scripts {
+    <script>
+        (() => {
+            const rows = @Html.Raw(overview);
+            const host = document.getElementById('metricOverview');
+            const select = document.getElementById('overviewMetric');
+            if (!host || !select) return;
+            const sites = [...new Set(rows.map(row => row.site))].sort();
+            const quantities = [...new Set(rows.map(row => row.quantity))].sort();
+            const escape = value => $('<div>').text(value).html();
+            const format = (metric, value) => metric.toLowerCase() === 'n'
+                ? Math.round(value).toLocaleString()
+                : (Math.abs(value) >= 1000 || (value !== 0 && Math.abs(value) < 0.001)
+                    ? value.toExponential(3) : value.toFixed(4).replace(/\.?0+$/, ''));
+            function render() {
+                const metric = select.value;
+                let html = '<table class="table table-sm table-hover align-middle mb-0"><thead><tr><th class="ps-3">Site</th>';
+                quantities.forEach(quantity => html += `<th>${escape(quantity)}</th>`);
+                html += '</tr></thead><tbody>';
+                sites.forEach(site => {
+                    html += `<tr><th class="ps-3 text-nowrap">${escape(site)}</th>`;
+                    quantities.forEach(quantity => {
+                        const row = rows.find(item => item.site === site && item.quantity === quantity && item.metrics[metric] !== undefined);
+                        html += row
+                            ? `<td><a href="/EvaluationRuns/Comparison/${row.resultId}" class="text-decoration-none">${format(metric, row.metrics[metric])}</a></td>`
+                            : '<td class="text-muted">—</td>';
+                    });
+                    html += '</tr>';
+                });
+                host.innerHTML = html + '</tbody></table>';
+            }
+            select.addEventListener('change', render);
+            render();
+        })();
+    </script>
+}
+
 @functions {
     private static string Duration(DateTime started, DateTime? completed) => completed.HasValue
         ? (completed.Value - started).ToString(@"hh\:mm\:ss") : "—";
-    private static string FormatMetric(double value) => Math.Abs(value) >= 1000 || (value != 0 && Math.Abs(value) < 0.001)
-        ? value.ToString("0.###e+0") : value.ToString("0.####");
+    private static string FormatMetric(string type, double value) => type.Equals("n", StringComparison.OrdinalIgnoreCase)
+        ? Math.Round(value).ToString("N0")
+        : Math.Abs(value) >= 1000 || (value != 0 && Math.Abs(value) < 0.001)
+            ? value.ToString("0.###e+0") : value.ToString("0.####");
     private static string OutcomeText(EvaluationRunStatus status, bool? passed) => status switch
     {
         EvaluationRunStatus.Succeeded when passed == true => "Passed",

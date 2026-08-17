@@ -62,6 +62,10 @@ public class EvaluationRunDetailsViewModel
     public string TargetBranch { get; init; } = string.Empty;
     public string BenchmarkName { get; init; } = string.Empty;
     public IReadOnlyList<EvaluationDatasetDetailsViewModel> Datasets { get; init; } = [];
+    public int ComparisonCount { get; init; }
+    public int DatasetCountWithoutBaseline { get; init; }
+    public int UnchangedComparisonCount { get; init; }
+    public IReadOnlyList<string> MetricTypes { get; init; } = [];
 }
 
 public class EvaluationDatasetDetailsViewModel
@@ -78,13 +82,33 @@ public class EvaluationDatasetDetailsViewModel
 
 public class EvaluationResultDetailsViewModel
 {
+    public int Id { get; init; }
     public string CandidateVariable { get; init; } = string.Empty;
     public string CandidateLayer { get; init; } = string.Empty;
     public string ObservationDataset { get; init; } = string.Empty;
     public string ObservationVariable { get; init; } = string.Empty;
     public string ObservationLayer { get; init; } = string.Empty;
     public IReadOnlyList<EvaluationMetricViewModel> Metrics { get; init; } = [];
+    public bool? MetricsUnchangedFromBaseline { get; init; }
 }
+
+public class EvaluationComparisonViewModel
+{
+    public int ResultId { get; init; }
+    public int EvaluationRunId { get; init; }
+    public string Site { get; init; } = string.Empty;
+    public string CandidateVariable { get; init; } = string.Empty;
+    public string CandidateLayer { get; init; } = string.Empty;
+    public string ObservationVariable { get; init; } = string.Empty;
+    public string ObservationLayer { get; init; } = string.Empty;
+    public string Units { get; init; } = string.Empty;
+    public IReadOnlyList<EvaluationChartPoint> CandidatePoints { get; init; } = [];
+    public IReadOnlyList<EvaluationChartPoint> ObservationPoints { get; init; } = [];
+    public IReadOnlyList<EvaluationPairedPoint> PairedPoints { get; init; } = [];
+}
+
+public record EvaluationChartPoint(DateTime Timestamp, double Value);
+public record EvaluationPairedPoint(DateTime Timestamp, double Observed, double Predicted);
 
 public class EvaluationMetricViewModel
 {
