@@ -1,0 +1,128 @@
+@using Dave.Benchmarks.Core.Models.Entities
+@model Dave.Benchmarks.Web.Models.EvaluationRunDetailsViewModel
+
+@{
+    ViewData["Title"] = $"Evaluation #{Model.Id}";
+}
+
+<div class="mb-3">
+    <a asp-action="Index" asp-route-projectId="@Model.ProjectId" asp-route-mergeRequestId="@Model.MergeRequestId">← Back to MR !@Model.MergeRequestId</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2 class="mb-1">Evaluation #@Model.Id</h2>
+        <div class="text-muted">@Model.BenchmarkName · submission #@Model.SubmissionId · pipeline @Model.PipelineId</div>
+    </div>
+    <span class="badge fs-6 @OutcomeClass(Model.Status, Model.Passed)">@OutcomeText(Model.Status, Model.Passed)</span>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger"><strong>Run error:</strong> @Model.ErrorMessage</div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3"><div class="text-muted small">Merge request</div><strong>Project @Model.ProjectId · !@Model.MergeRequestId</strong></div>
+            <div class="col-md-3"><div class="text-muted small">Branches</div><strong>@Model.SourceBranch → @Model.TargetBranch</strong></div>
+            <div class="col-md-3"><div class="text-muted small">Started</div><strong>@Model.StartedAt.ToLocalTime().ToString("g")</strong></div>
+            <div class="col-md-3"><div class="text-muted small">Duration</div><strong>@Duration(Model.StartedAt, Model.CompletedAt)</strong></div>
+            <div class="col-12">
+                <div class="text-muted small">Commit</div>
+                <code>@Model.CommitSha</code>
+                @if (!string.IsNullOrWhiteSpace(Model.CommitMessage))
+                {
+                    <span> · @Model.CommitMessage</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.Datasets.Count == 0)
+{
+    <div class="alert alert-light border">This run contains no dataset results.</div>
+}
+else
+{
+    <div class="accordion" id="datasetResults">
+        @for (var index = 0; index < Model.Datasets.Count; index++)
+        {
+            var dataset = Model.Datasets[index];
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button @(index == 0 ? "" : "collapsed")" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#dataset-@dataset.CandidateDatasetId">
+                        <span class="me-2">@dataset.CandidateName</span>
+                        <span class="badge @OutcomeClass(dataset.Status, dataset.Passed)">@OutcomeText(dataset.Status, dataset.Passed)</span>
+                    </button>
+                </h2>
+                <div id="dataset-@dataset.CandidateDatasetId" class="accordion-collapse collapse @(index == 0 ? "show" : "")" data-bs-parent="#datasetResults">
+                    <div class="accordion-body">
+                        <div class="row mb-3 small">
+                            <div class="col-md-4"><span class="text-muted">Simulation:</span> @dataset.SimulationId</div>
+                            <div class="col-md-4"><span class="text-muted">Baseline:</span> @(dataset.BaselineName ?? "None")</div>
+                            <div class="col-md-4"><span class="text-muted">Comparisons:</span> @dataset.Results.Count</div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(dataset.ErrorMessage))
+                        {
+                            <div class="alert alert-danger">@dataset.ErrorMessage</div>
+                        }
+                        @if (dataset.Results.Count == 0)
+                        {
+                            <div class="text-muted">No comparable observation variables were found.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped align-middle">
+                                    <thead><tr><th>Prediction</th><th>Observation</th><th>Metrics</th></tr></thead>
+                                    <tbody>
+                                    @foreach (var result in dataset.Results)
+                                    {
+                                        <tr>
+                                            <td><strong>@result.CandidateVariable</strong><br /><span class="text-muted small">@result.CandidateLayer</span></td>
+                                            <td><strong>@result.ObservationDataset / @result.ObservationVariable</strong><br /><span class="text-muted small">@result.ObservationLayer</span></td>
+                                            <td>
+                                                @foreach (var metric in result.Metrics)
+                                                {
+                                                    <span class="badge text-bg-light border me-1"><strong>@metric.Type</strong> @FormatMetric(metric.Value)</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@functions {
+    private static string Duration(DateTime started, DateTime? completed) => completed.HasValue
+        ? (completed.Value - started).ToString(@"hh\:mm\:ss") : "—";
+    private static string FormatMetric(double value) => Math.Abs(value) >= 1000 || (value != 0 && Math.Abs(value) < 0.001)
+        ? value.ToString("0.###e+0") : value.ToString("0.####");
+    private static string OutcomeText(EvaluationRunStatus status, bool? passed) => status switch
+    {
+        EvaluationRunStatus.Succeeded when passed == true => "Passed",
+        EvaluationRunStatus.Succeeded => "Failed gate",
+        EvaluationRunStatus.Failed => "Error",
+        EvaluationRunStatus.Running => "Running",
+        _ => "Pending"
+    };
+    private static string OutcomeClass(EvaluationRunStatus status, bool? passed) => status switch
+    {
+        EvaluationRunStatus.Succeeded when passed == true => "text-bg-success",
+        EvaluationRunStatus.Succeeded => "text-bg-danger",
+        EvaluationRunStatus.Failed => "text-bg-danger",
+        EvaluationRunStatus.Running => "text-bg-primary",
+        _ => "text-bg-secondary"
+    };
+}

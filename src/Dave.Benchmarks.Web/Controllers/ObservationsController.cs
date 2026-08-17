@@ -162,6 +162,22 @@ public class ObservationsController : ControllerBase
         return Ok();
     }
 
+    [HttpDelete("groups/{groupId}")]
+    public async Task<ActionResult> DeleteGroup(int groupId, CancellationToken cancellationToken)
+    {
+        DatasetGroup? group = await _dbContext.DatasetGroups
+            .Include(g => g.Datasets)
+            .FirstOrDefaultAsync(g => g.Id == groupId, cancellationToken);
+        if (group == null) return NotFound();
+        if (group.Kind == DatasetGroupKind.Prediction) return BadRequest("Group is not an observation release");
+        if (group.IsActive) return Conflict("Active observation releases cannot be deleted");
+
+        _dbContext.Datasets.RemoveRange(group.Datasets);
+        _dbContext.DatasetGroups.Remove(group);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("datasets/create")]
     public async Task<ActionResult<int>> CreateDataset([FromBody] CreateObservationDatasetRequest request)
     {

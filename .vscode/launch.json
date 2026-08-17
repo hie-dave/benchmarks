@@ -15,7 +15,8 @@
                 "observations",
                 "--manifest",
                 "${workspaceFolder}/fluxes.yml",
-                "--activate"
+                "--activate",
+                "--cleanup-on-failure"
             ],
             "cwd": "${workspaceFolder}/src/Dave.Benchmarks.CLI",
             "envFile": "${workspaceFolder}/.vscode/.cli-debug.env",

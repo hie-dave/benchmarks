@@ -1,0 +1,127 @@
+@using Dave.Benchmarks.Core.Models.Entities
+@model Dave.Benchmarks.Web.Models.EvaluationRunIndexViewModel
+
+@{
+    ViewData["Title"] = "Evaluations";
+}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2 class="mb-1">Evaluation runs</h2>
+        <p class="text-muted mb-0">Browse benchmark history by merge request, commit, and evaluation attempt.</p>
+    </div>
+</div>
+
+@if (Model.MergeRequests.Count == 0)
+{
+    <div class="alert alert-light border">No benchmark submissions have been evaluated yet.</div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card sticky-lg-top" style="top: 1rem;">
+                <div class="card-header"><strong>Merge requests</strong></div>
+                <div class="list-group list-group-flush">
+                    @foreach (var mr in Model.MergeRequests)
+                    {
+                        var selected = mr.ProjectId == Model.SelectedProjectId && mr.MergeRequestId == Model.SelectedMergeRequestId;
+                        <a class="list-group-item list-group-item-action @(selected ? "active" : "")"
+                           asp-action="Index" asp-route-projectId="@mr.ProjectId" asp-route-mergeRequestId="@mr.MergeRequestId">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>MR !@mr.MergeRequestId</strong>
+                                <span class="badge @OutcomeClass(mr.LatestStatus, mr.LatestPassed)">@OutcomeText(mr.LatestStatus, mr.LatestPassed)</span>
+                            </div>
+                            <div class="small mt-1">@mr.SourceBranch → @mr.TargetBranch</div>
+                            <div class="small @(selected ? "text-white-50" : "text-muted") mt-1">
+                                Project @mr.ProjectId · @mr.RunCount run(s) · @mr.LastTestedAt.ToLocalTime().ToString("g")
+                            </div>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">MR !@Model.SelectedMergeRequestId</h4>
+                <span class="text-muted">Project @Model.SelectedProjectId</span>
+            </div>
+
+            @foreach (var submission in Model.Submissions)
+            {
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <strong>@submission.BenchmarkName</strong>
+                                <div class="small text-muted">
+                                    <code>@ShortSha(submission.CommitSha)</code>
+                                    @if (!string.IsNullOrWhiteSpace(submission.CommitMessage))
+                                    {
+                                        <span> · @FirstLine(submission.CommitMessage)</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="text-end small text-muted">
+                                Pipeline @submission.PipelineId<br />
+                                @submission.CreatedAt.ToLocalTime().ToString("g")
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (submission.Runs.Count == 0)
+                        {
+                            <div class="p-3 text-muted">This submission has no evaluation runs.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead><tr><th>Run</th><th>Started</th><th>Duration</th><th>Outcome</th><th></th></tr></thead>
+                                    <tbody>
+                                    @foreach (var run in submission.Runs)
+                                    {
+                                        <tr>
+                                            <td>#@run.Id</td>
+                                            <td>@run.StartedAt.ToLocalTime().ToString("g")</td>
+                                            <td>@Duration(run.StartedAt, run.CompletedAt)</td>
+                                            <td><span class="badge @OutcomeClass(run.Status, run.Passed)">@OutcomeText(run.Status, run.Passed)</span></td>
+                                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@run.Id">View results</a></td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@functions {
+    private static string ShortSha(string sha) => sha.Length <= 8 ? sha : sha[..8];
+    private static string FirstLine(string message) => message.Split('\n', 2)[0];
+    private static string Duration(DateTime started, DateTime? completed) => completed.HasValue
+        ? (completed.Value - started).ToString(@"hh\:mm\:ss") : "—";
+    private static string OutcomeText(EvaluationRunStatus? status, bool? passed) => status switch
+    {
+        EvaluationRunStatus.Succeeded when passed == true => "Passed",
+        EvaluationRunStatus.Succeeded => "Failed gate",
+        EvaluationRunStatus.Failed => "Error",
+        EvaluationRunStatus.Running => "Running",
+        EvaluationRunStatus.Pending => "Pending",
+        _ => "No runs"
+    };
+    private static string OutcomeClass(EvaluationRunStatus? status, bool? passed) => status switch
+    {
+        EvaluationRunStatus.Succeeded when passed == true => "text-bg-success",
+        EvaluationRunStatus.Succeeded => "text-bg-danger",
+        EvaluationRunStatus.Failed => "text-bg-danger",
+        EvaluationRunStatus.Running => "text-bg-primary",
+        EvaluationRunStatus.Pending => "text-bg-secondary",
+        _ => "text-bg-light"
+    };
+}

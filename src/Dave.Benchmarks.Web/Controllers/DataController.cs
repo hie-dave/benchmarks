@@ -14,18 +14,33 @@ public class DataController : Controller
 {
     private readonly BenchmarksDbContext _dbContext;
     private readonly ILogger<DataController> _logger;
+    private readonly IWebHostEnvironment? _environment;
 
-    public DataController(BenchmarksDbContext dbContext, ILogger<DataController> logger)
+    public DataController(
+        BenchmarksDbContext dbContext,
+        ILogger<DataController> logger,
+        IWebHostEnvironment? environment = null)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _environment = environment;
     }
 
-    public async Task<IActionResult> Index()
+    public Task<IActionResult> Index() => Predictions();
+
+    public Task<IActionResult> Predictions() => Explorer(DatasetGroupKind.Prediction, "Predictions");
+
+    public Task<IActionResult> Observations() => Explorer(null, "Observations");
+
+    private async Task<IActionResult> Explorer(DatasetGroupKind? groupKind, string title)
     {
-        var datasets = await _dbContext.Datasets
+        IQueryable<Dataset> query = _dbContext.Datasets
             .Include(d => d.Variables)
-            .Include(d => d.Group)
+            .Include(d => d.Group);
+        query = groupKind == DatasetGroupKind.Prediction
+            ? query.Where(d => d is PredictionDataset)
+            : query.Where(d => d is ObservationDataset);
+        List<Dataset> datasets = await query
             .AsSplitQuery()
             .ToListAsync();
 
@@ -35,10 +50,23 @@ public class DataController : Controller
             .OrderBy(g => g.Key?.Name ?? "")
             .ToList();
 
-        return View(groupedDatasets);
+        ViewData["Title"] = title;
+        ViewData["ExplorerKind"] = title;
+        ViewData["ShowDeleteControls"] = _environment?.IsDevelopment() == true;
+        return View("Index", groupedDatasets);
     }
 
     public async Task<IActionResult> Timeseries()
+    {
+        return View(await GetPlotDatasets());
+    }
+
+    public async Task<IActionResult> Relationships()
+    {
+        return View(await GetPlotDatasets());
+    }
+
+    private async Task<List<IGrouping<DatasetGroup?, Dataset>>> GetPlotDatasets()
     {
         var datasets = await _dbContext.Datasets
             .Include(d => d.Variables)
@@ -53,7 +81,7 @@ public class DataController : Controller
             .OrderBy(g => g.Key?.Name ?? "")
             .ToList();
 
-        return View(groupedDatasets);
+        return groupedDatasets;
     }
 
     [HttpGet("api/data/datasets")]
@@ -332,7 +360,7 @@ public class DataController : Controller
     }
 
     [HttpDelete("api/data/dataset/{id}")]
-    [Authorize(Policy = AuthorizationPolicies.GitLabProtectedRef)]
+    [Authorize(Policy = AuthorizationPolicies.DevelopmentOrGitLabProtectedRef)]
     public async Task<ActionResult> DeleteDataset(int id)
     {
         var dataset = await _dbContext.Datasets.FindAsync(id);
@@ -345,7 +373,7 @@ public class DataController : Controller
     }
 
     [HttpDelete("api/data/group/{id}")]
-    [Authorize(Policy = AuthorizationPolicies.GitLabProtectedRef)]
+    [Authorize(Policy = AuthorizationPolicies.DevelopmentOrGitLabProtectedRef)]
     public async Task<ActionResult> DeleteGroup(int id)
     {
         var group = await _dbContext.DatasetGroups

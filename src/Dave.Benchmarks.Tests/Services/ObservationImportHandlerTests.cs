@@ -13,6 +13,56 @@ namespace Dave.Benchmarks.Tests.Services;
 public class ObservationImportHandlerTests
 {
     [Fact]
+    public async Task RunAsync_WhenImportFailsAndCleanupRequested_DeletesGroup()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"observation-cleanup-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(directory, "flux.csv"),
+                "date,site,gpp\n2026-01-01,AU-Tum,1.5\n");
+            string manifestPath = Path.Combine(directory, "observations.yaml");
+            await File.WriteAllTextAsync(manifestPath, """
+                collection: ozflux
+                source: ozflux
+                version: test-cleanup
+                kind: site
+                files:
+                  - path: flux.csv
+                    temporal_resolution: daily
+                    variables:
+                      - column: gpp
+                        name: gpp
+                        units: kgC/m2/day
+                """);
+
+            Mock<IApiClient> api = new();
+            api.Setup(a => a.CreateObservationGroupAsync(
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<DatasetGroupKind>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(73);
+            api.Setup(a => a.CreateObservationDatasetAsync(
+                    It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<string>(), It.IsAny<MatchingStrategy>(), It.IsAny<int?>(),
+                    It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new HttpRequestException("upload failed"));
+            ObservationImportHandler handler = CreateHandler(api.Object);
+
+            await Assert.ThrowsAsync<HttpRequestException>(() => handler.RunAsync(new ObservationImportOptions
+            {
+                Manifest = manifestPath,
+                CleanupOnFailure = true
+            }));
+
+            api.Verify(a => a.DeleteObservationGroupAsync(73, It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_SiteGzipCsv_CreatesDatasetPerSiteAndActivatesRelease()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"observation-import-{Guid.NewGuid():N}");
@@ -61,11 +111,7 @@ public class ObservationImportHandlerTests
                     It.IsAny<int>(), It.IsAny<CreateLayerRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(40).ReturnsAsync(41);
 
-            ApiSettings settings = new() { WebApiUrl = "https://benchmarks.example.test" };
-            GitLabCuratorAuthenticator authenticator = new(
-                Mock.Of<IHttpClientFactory>(), settings, Mock.Of<ILogger<GitLabCuratorAuthenticator>>());
-            ObservationImportHandler handler = new(
-                api.Object, authenticator, settings, Mock.Of<ILogger<ObservationImportHandler>>());
+            ObservationImportHandler handler = CreateHandler(api.Object);
 
             await handler.RunAsync(new ObservationImportOptions { Manifest = manifestPath, Activate = true });
 
@@ -87,5 +133,14 @@ public class ObservationImportHandlerTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    private static ObservationImportHandler CreateHandler(IApiClient api)
+    {
+        ApiSettings settings = new() { WebApiUrl = "https://benchmarks.example.test" };
+        GitLabCuratorAuthenticator authenticator = new(
+            Mock.Of<IHttpClientFactory>(), settings, Mock.Of<ILogger<GitLabCuratorAuthenticator>>());
+        return new ObservationImportHandler(
+            api, authenticator, settings, Mock.Of<ILogger<ObservationImportHandler>>());
     }
 }

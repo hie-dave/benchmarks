@@ -1,3 +1,6 @@
+@{
+    var fullWidth = ViewData["FullWidth"] as bool? ?? false;
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,17 +27,26 @@
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Data" asp-action="Index">Data</a>
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Data" asp-action="Predictions">Predictions</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Data" asp-action="Observations">Observations</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="EvaluationRuns" asp-action="Index">Evaluations</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Data" asp-action="Timeseries">Timeseries</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Data" asp-action="Relationships">Relationships</a>
                         </li>
                     </ul>
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container">
+    <div class="@(fullWidth ? "container-fluid px-3 px-xl-4" : "container")">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>

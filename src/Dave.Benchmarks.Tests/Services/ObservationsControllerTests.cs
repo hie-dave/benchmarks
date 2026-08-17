@@ -534,6 +534,35 @@ public class ObservationsControllerTests
     }
 
     [Fact]
+    public async Task DeleteGroup_WhenInactive_RemovesReleaseAndDatasets()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        ObservationDataset observation = EvaluationSeed.CreateObservationDataset(db, active: false);
+        int groupId = observation.GroupId!.Value;
+
+        ActionResult result = await CreateController(db).DeleteGroup(groupId, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.False(db.DatasetGroups.Any(g => g.Id == groupId));
+        Assert.False(db.Datasets.Any(d => d.Id == observation.Id));
+    }
+
+    [Fact]
+    public async Task DeleteGroup_WhenActive_ReturnsConflict()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        ObservationDataset observation = EvaluationSeed.CreateObservationDataset(db, active: true);
+
+        ActionResult result = await CreateController(db)
+            .DeleteGroup(observation.GroupId!.Value, CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(result);
+        Assert.True(db.DatasetGroups.Any(g => g.Id == observation.GroupId));
+    }
+
+    [Fact]
     public async Task ActivateGroup_ReplacesActiveVersionOfSameCollection()
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();

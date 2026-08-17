@@ -48,61 +48,80 @@ public class ObservationImportHandler
             production.SetBearerToken(await authenticator.AuthenticateAsync(cancellationToken));
         }
 
-        DatasetGroupKind kind = ParseKind(manifest.Kind);
-        MatchingStrategy strategy = ParseStrategy(manifest.MatchingStrategy);
-        int groupId = await api.CreateObservationGroupAsync(
-            manifest.Collection, manifest.Source, manifest.Version, manifest.Description,
-            kind, manifest.Metadata, cancellationToken);
-
-        string temporalResolution = manifest.Files.Select(f => f.TemporalResolution).Distinct(StringComparer.Ordinal).Single();
-        Dictionary<string, int> datasets = [];
-        IReadOnlyDictionary<string, HashSet<(string Name, string Layer)>>? siteVariables = null;
-        if (kind == DatasetGroupKind.ObservationSite)
+        int? groupId = null;
+        try
         {
-            siteVariables = DiscoverSiteVariables(manifest, baseDirectory);
-            foreach (string site in siteVariables.Keys.Order(StringComparer.Ordinal))
+            DatasetGroupKind kind = ParseKind(manifest.Kind);
+            MatchingStrategy strategy = ParseStrategy(manifest.MatchingStrategy);
+            groupId = await api.CreateObservationGroupAsync(
+                manifest.Collection, manifest.Source, manifest.Version, manifest.Description,
+                kind, manifest.Metadata, cancellationToken);
+
+            string temporalResolution = manifest.Files.Select(f => f.TemporalResolution).Distinct(StringComparer.Ordinal).Single();
+            Dictionary<string, int> datasets = [];
+            IReadOnlyDictionary<string, HashSet<(string Name, string Layer)>>? siteVariables = null;
+            if (kind == DatasetGroupKind.ObservationSite)
             {
-                datasets[site] = await api.CreateObservationDatasetAsync(
-                    groupId, site, $"{manifest.Collection} observations for {site}", temporalResolution,
-                    site, MatchingStrategy.ByName, null, "{}", cancellationToken);
+                siteVariables = DiscoverSiteVariables(manifest, baseDirectory);
+                foreach (string site in siteVariables.Keys.Order(StringComparer.Ordinal))
+                {
+                    datasets[site] = await api.CreateObservationDatasetAsync(
+                        groupId.Value, site, $"{manifest.Collection} observations for {site}", temporalResolution,
+                        site, MatchingStrategy.ByName, null, "{}", cancellationToken);
+                }
             }
-        }
-        else
-        {
-            datasets[manifest.Collection] = await api.CreateObservationDatasetAsync(
-                groupId, manifest.Collection, manifest.Description, temporalResolution,
-                manifest.Collection, strategy, manifest.MaxDistanceKm, "{}", cancellationToken);
-        }
-
-        Dictionary<(string Dataset, string Variable, string Layer), int> layerIds = [];
-        foreach ((string datasetName, int datasetId) in datasets)
-        {
-            foreach (ObservationVariableManifest variable in manifest.Files.SelectMany(f => f.Variables)
-                         .GroupBy(v => (v.Name, v.Layer)).Select(g => g.First())
-                         .Where(v => siteVariables == null || siteVariables[datasetName].Contains((v.Name, v.Layer))))
+            else
             {
-                AggregationLevel level = Enum.Parse<AggregationLevel>(variable.Level, true);
-                int variableId = await api.CreateObservationVariableAsync(datasetId, new CreateVariableRequest
-                {
-                    Name = variable.Name,
-                    Description = variable.Description,
-                    Units = variable.Units,
-                    Level = level
-                }, cancellationToken);
-                int layerId = await api.CreateObservationLayerAsync(variableId, new CreateLayerRequest
-                {
-                    Name = variable.Layer,
-                    Description = variable.Description
-                }, cancellationToken);
-                layerIds[(datasetName, variable.Name, variable.Layer)] = layerId;
+                datasets[manifest.Collection] = await api.CreateObservationDatasetAsync(
+                    groupId.Value, manifest.Collection, manifest.Description, temporalResolution,
+                    manifest.Collection, strategy, manifest.MaxDistanceKm, "{}", cancellationToken);
             }
-        }
 
-        await UploadFiles(manifest, baseDirectory, kind, layerIds, cancellationToken);
-        await api.CompleteObservationGroupAsync(groupId, cancellationToken);
-        if (options.Activate) await api.ActivateObservationGroupAsync(groupId, cancellationToken);
-        logger.LogInformation("Imported observation release {Collection}/{Version} as group {GroupId}",
-            manifest.Collection, manifest.Version, groupId);
+            Dictionary<(string Dataset, string Variable, string Layer), int> layerIds = [];
+            foreach ((string datasetName, int datasetId) in datasets)
+            {
+                foreach (ObservationVariableManifest variable in manifest.Files.SelectMany(f => f.Variables)
+                             .GroupBy(v => (v.Name, v.Layer)).Select(g => g.First())
+                             .Where(v => siteVariables == null || siteVariables[datasetName].Contains((v.Name, v.Layer))))
+                {
+                    AggregationLevel level = Enum.Parse<AggregationLevel>(variable.Level, true);
+                    int variableId = await api.CreateObservationVariableAsync(datasetId, new CreateVariableRequest
+                    {
+                        Name = variable.Name,
+                        Description = variable.Description,
+                        Units = variable.Units,
+                        Level = level
+                    }, cancellationToken);
+                    int layerId = await api.CreateObservationLayerAsync(variableId, new CreateLayerRequest
+                    {
+                        Name = variable.Layer,
+                        Description = variable.Description
+                    }, cancellationToken);
+                    layerIds[(datasetName, variable.Name, variable.Layer)] = layerId;
+                }
+            }
+
+            await UploadFiles(manifest, baseDirectory, kind, layerIds, cancellationToken);
+            await api.CompleteObservationGroupAsync(groupId.Value, cancellationToken);
+            if (options.Activate) await api.ActivateObservationGroupAsync(groupId.Value, cancellationToken);
+            logger.LogInformation("Imported observation release {Collection}/{Version} as group {GroupId}",
+                manifest.Collection, manifest.Version, groupId);
+        }
+        catch (Exception importError) when (groupId.HasValue && options.CleanupOnFailure)
+        {
+            try
+            {
+                logger.LogWarning(importError,
+                    "Observation import failed; deleting partial group {GroupId}", groupId.Value);
+                await api.DeleteObservationGroupAsync(groupId.Value, CancellationToken.None);
+            }
+            catch (Exception cleanupError)
+            {
+                logger.LogError(cleanupError,
+                    "Failed to delete partial observation group {GroupId}", groupId.Value);
+            }
+            throw;
+        }
     }
 
     private async Task UploadFiles(

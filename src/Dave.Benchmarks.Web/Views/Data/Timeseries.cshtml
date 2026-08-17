@@ -1,254 +1,246 @@
+@using System.Text.Json
 @using Dave.Benchmarks.Core.Models.Entities
 @model IEnumerable<IGrouping<DatasetGroup?, Dataset>>
 @{
-    ViewData["Title"] = "Timeseries Plot";
+    ViewData["Title"] = "Timeseries";
+    ViewData["FullWidth"] = true;
+    var datasetCatalog = JsonSerializer.Serialize(Model.SelectMany(group => group).DistinctBy(dataset => dataset.Id).Select(dataset => new
+    {
+        dataset.Id, dataset.Name, dataset.SimulationId, dataset.SpatialResolution,
+        Type = dataset is PredictionDataset ? "Prediction" : "Observation",
+        GroupName = dataset.Group?.Name,
+        GroupKind = dataset.Group == null ? (int?)null : (int)dataset.Group.Kind,
+        Variables = dataset.Variables.DistinctBy(variable => variable.Id).OrderBy(variable => variable.Name).Select(variable => new
+        {
+            variable.Id, variable.Name, variable.Units,
+            Layers = variable.Layers.DistinctBy(layer => layer.Id).OrderBy(layer => layer.Name).Select(layer => new { layer.Id, layer.Name })
+        })
+    }), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 }
 
-<div class="container mt-4">
-    <h2>Timeseries Plot</h2>
-    
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="form-group">
-                <label for="datasetGroupSelect">Dataset Group or Dataset</label>
-                <select class="form-control" id="datasetGroupSelect">
-                    <option value="">Select...</option>
-                    <!-- Ungrouped Datasets -->
-                    @{
-                        var ungroupedDatasets = Model.FirstOrDefault(g => g.Key == null);
-                        if (ungroupedDatasets != null && ungroupedDatasets.Any())
-                        {
-                            <optgroup label="Ungrouped Datasets">
-                                @foreach (var dataset in ungroupedDatasets)
-                                {
-                                    <option value="dataset-@dataset.Id" data-type="dataset" data-id="@dataset.Id">
-                                        @dataset.Name (@dataset.Variables.Count) variables
-                                    </option>
-                                }
-                            </optgroup>
-                        }
-                    }
-                    <!-- Dataset Groups -->
-                    @if (Model.Any(g => g.Key != null))
-                    {
-                        <optgroup label="Dataset Groups">
-                            @foreach (var group in Model.Where(g => g.Key != null))
-                            {
-                                <option value="group-@group.Key!.Id" data-type="group" data-id="@group.Key!.Id">
-                                    @group.Key!.Name (@group.Count() datasets, @group.Sum(d => d.Variables.Count) variables)
-                                </option>
-                            }
-                        </optgroup>
-                    }
-                </select>
-            </div>
+<div class="mb-3">
+    <h2 class="mb-1">Timeseries</h2>
+    <p class="text-muted mb-0">Overlay variables and layers matched by timestamp.</p>
+</div>
+
+<div class="row g-4 align-items-start">
+    <div class="col-lg-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Series</strong>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="addSeries">Add series</button>
         </div>
-        <div class="col-md-3">
-            <div class="form-group">
-                <label for="datasetSelect">Dataset</label>
-                <select class="form-control" id="datasetSelect" disabled>
-                    <option value="">Select dataset...</option>
-                </select>
-            </div>
+        <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="restrictSite" checked>
+            <label class="form-check-label" for="restrictSite">Restrict additional datasets to the first site/simulation</label>
         </div>
-        <div class="col-md-3">
-            <div class="form-group">
-                <label for="variable">Variable</label>
-                <select class="form-control" id="variable" disabled>
-                    <option value="">Select a variable...</option>
-                </select>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="form-group">
-                <label for="layer">Layer</label>
-                <select class="form-control" id="layer" disabled>
-                    <option value="">Select a layer...</option>
-                </select>
-            </div>
+        <div id="siteConstraint" class="alert alert-info py-2 d-none small"></div>
+        <div id="seriesContainer" class="vstack gap-3 overflow-auto pe-1" style="max-height: calc(100vh - 240px);"></div>
+    </div>
+    <div class="col-lg-9" style="min-width: 0;">
+        <div class="sticky-lg-top" style="top: 1rem;">
+            <div id="plotMessage" class="alert alert-light border">Select a dataset, variable, and at least one layer.</div>
+            <div id="plot" style="width: 100%; height: 700px;"></div>
         </div>
     </div>
-
-    <div id="plot" style="width: 100%; height: 600px;"></div>
 </div>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
-    
     <script>
         $(document).ready(function() {
-            const datasetGroupSelect = $('#datasetGroupSelect');
-            const datasetSelect = $('#datasetSelect');
-            const variable = $('#variable');
-            const layer = $('#layer');
+            const datasets = @Html.Raw(datasetCatalog);
+            const container = $('#seriesContainer');
+            let nextSeriesId = 1;
 
-            let currentDatasetId = null;
-            let currentGroupId = null;
+            function firstSelection() {
+                const id = Number(container.find('.series-card').first().find('.dataset-select').val());
+                return datasets.find(dataset => dataset.id === id) || null;
+            }
 
-            // Dataset Group/Dataset selection
-            datasetGroupSelect.on('change', function() {
-                const selected = $(this).find(':selected');
-                const type = selected.data('type');
-                const id = selected.data('id');
-
-                if (!type || !id) {
-                    resetSelections();
-                    return;
-                }
-
-                if (type === 'dataset') {
-                    currentDatasetId = id;
-                    currentGroupId = null;
-                    datasetSelect.prop('disabled', true).html('<option value="">Select dataset...</option>');
-                    updateVariables();
-                } else if (type === 'group') {
-                    currentGroupId = id;
-                    currentDatasetId = null;
-                    loadDatasetsInGroup(id);
-                }
-            });
-
-            // Dataset selection (for groups)
-            datasetSelect.on('change', function() {
-                currentDatasetId = $(this).val();
-                if (!currentDatasetId) {
-                    resetVariableAndLayer();
-                    return;
-                }
-                updateVariables();
-            });
-
-            function loadDatasetsInGroup(groupId) {
-                $.get(`/api/data/group/${groupId}/datasets`, function(datasets) {
-                    let options = '<option value="">Select dataset...</option>';
-                    datasets.forEach(d => {
-                        @* This API endpoint doesn't return the variables. *@
-                        options += `<option value="${d.id}">${d.name}</option>`;
+            function datasetOptions() {
+                const groups = new Map();
+                datasets.forEach(dataset => {
+                    const group = dataset.groupName || 'Ungrouped datasets';
+                    if (!groups.has(group)) groups.set(group, []);
+                    groups.get(group).push(dataset);
+                });
+                let html = '<option value="">Select a dataset...</option>';
+                [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([group, members]) => {
+                    html += `<optgroup label="${escapeHtml(group)}">`;
+                    members.sort((a, b) => a.name.localeCompare(b.name)).forEach(dataset => {
+                        html += `<option value="${dataset.id}">${escapeHtml(dataset.name)} — ${dataset.type}</option>`;
                     });
-                    datasetSelect.html(options).prop('disabled', false);
-                    resetVariableAndLayer();
+                    html += '</optgroup>';
+                });
+                return html;
+            }
+
+            function addSeries() {
+                const id = nextSeriesId++;
+                const card = $(`
+                    <div class="card series-card" data-series-id="${id}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <strong>Series ${id}</strong>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-series">Remove</button>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-12"><label class="form-label">Dataset</label><select class="form-select dataset-select">${datasetOptions()}</select></div>
+                                <div class="col-12"><label class="form-label">Variable</label><select class="form-select variable-select" disabled><option value="">Select a variable...</option></select></div>
+                                <div class="col-12">
+                                    <label class="form-label">Layers</label>
+                                    <select class="form-select layer-select" multiple size="4" disabled><option value="" disabled selected>Select one or more layers...</option></select>
+                                    <div class="form-text">Use Ctrl/Cmd to select multiple layers.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`);
+                container.append(card);
+                container.find('.remove-series').toggle(container.children().length > 1);
+                applySiteConstraint();
+            }
+
+            function applySiteConstraint() {
+                const first = firstSelection();
+                const constrained = Boolean($('#restrictSite').is(':checked') && first?.simulationId);
+                $('#siteConstraint').toggleClass('d-none', !constrained)
+                    .text(constrained ? `Additional series are restricted to “${first.simulationId}”. Turn the option off to compare sites.` : '');
+
+                container.find('.series-card').each(function(index) {
+                    if (index === 0) return;
+                    const select = $(this).find('.dataset-select');
+                    select.find('option[value!=""]').each(function() {
+                        const candidate = datasets.find(dataset => dataset.id === Number(this.value));
+                        this.disabled = Boolean(constrained && candidate && candidate.simulationId !== first.simulationId);
+                    });
+                    const selected = datasets.find(dataset => dataset.id === Number(select.val()));
+                    if (constrained && selected && selected.simulationId !== first.simulationId) select.val('').trigger('change');
                 });
             }
 
-            function updateVariables() {
-                if (!currentDatasetId) {
-                    resetVariableAndLayer();
-                    return;
-                }
-
-                $.get(`/api/data/dataset/${currentDatasetId}/variables`, function(variables) {
-                    let options = '<option value="">Select a variable...</option>';
-                    variables.forEach(v => {
-                        options += `<option value="${v.id}">${v.name}</option>`;
-                    });
-                    variable.html(options).prop('disabled', false);
-                    layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
+            function populateVariables(card, dataset) {
+                let html = '<option value="">Select a variable...</option>';
+                dataset.variables.forEach(variable => {
+                    const units = variable.units ? ` (${escapeHtml(variable.units)})` : '';
+                    html += `<option value="${variable.id}">${escapeHtml(variable.name)}${units}</option>`;
                 });
+                card.find('.variable-select').html(html).prop('disabled', false);
+                resetLayers(card);
             }
 
-            function updateLayers(variableId) {
-                if (!currentDatasetId || !variableId) {
-                    layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
-                    return;
-                }
-
-                $.get(`/api/data/dataset/${currentDatasetId}/variable/${variableId}/layers`, function(layers) {
-                    let options = '<option value="">All Layers</option>';
-                    layers.forEach(l => {
-                        options += `<option value="${l.id}">${l.name}</option>`;
-                    });
-                    layer.html(options).prop('disabled', layers.length === 0);
-                }).fail(function(error) {
-                    console.error('Error loading layers:', error);
-                    layer.prop('disabled', true).html('<option value="">Error loading layers</option>');
-                });
+            function populateLayers(card, variable) {
+                let html = '<option value="" disabled selected>Select one or more layers...</option>';
+                variable.layers.forEach(layer => html += `<option value="${layer.id}">${escapeHtml(layer.name)}</option>`);
+                card.find('.layer-select').html(html).prop('disabled', variable.layers.length === 0);
             }
 
-            function resetSelections() {
-                currentDatasetId = null;
-                currentGroupId = null;
-                datasetSelect.prop('disabled', true).html('<option value="">Select dataset...</option>');
-                resetVariableAndLayer();
+            function resetLayers(card) {
+                card.find('.layer-select').prop('disabled', true)
+                    .html('<option value="" disabled selected>Select one or more layers...</option>');
             }
 
-            function resetVariableAndLayer() {
-                variable.prop('disabled', true).html('<option value="">Select a variable...</option>');
-                layer.prop('disabled', true).html('<option value="">Select a layer...</option>');
-                Plotly.purge('plot');
+            async function loadTrace(selection, layer) {
+                const data = await $.get(`/api/data/dataset/${selection.dataset.id}/variable/${selection.variable.id}/data?layerId=${layer.id}`);
+                const points = new Map();
+                data.forEach(point => points.set(new Date(point.timestamp).toISOString(), point.value));
+                const group = selection.dataset.groupName || 'Ungrouped';
+                return { name: `${group} · ${selection.dataset.name} · ${selection.variable.name} · ${layer.name}`, points };
             }
 
-            function updatePlot() {
-                const datasetId = currentDatasetId;
-                const variableId = variable.val();
-                const layerId = layer.val();
-
-                if (!datasetId || !variableId) return;
-
-                // First get the time resolution
-                // $.get(`/api/data/dataset/${datasetId}/variable/${variableId}/timeresolution`, function(resolution) {
-                    // Then get the data and plot with the correct format
-                    let url = `/api/data/dataset/${datasetId}/variable/${variableId}/data`;
-                    const params = new URLSearchParams();
-                    
-                    if (layerId) params.append('layerId', layerId);
-                    
-                    if (params.toString()) {
-                        url += '?' + params.toString();
+            function completeSelections() {
+                const selections = [];
+                container.find('.series-card').each(function() {
+                    const card = $(this);
+                    const dataset = datasets.find(item => item.id === Number(card.find('.dataset-select').val()));
+                    const variable = dataset?.variables.find(item => item.id === Number(card.find('.variable-select').val()));
+                    const layerIds = (card.find('.layer-select').val() || []).map(Number);
+                    if (dataset && variable && layerIds.length) {
+                        selections.push({ dataset, variable, layers: variable.layers.filter(layer => layerIds.includes(layer.id)) });
                     }
-
-                    $.get(url, function(data) {
-                        if (!data || data.length === 0) {
-                            Plotly.purge('plot');
-                            return;
-                        }
-
-                        // Group data by layer
-                        const layerGroups = data.reduce((groups, item) => {
-                            const layer = item.layer || 'Default';
-                            if (!groups[layer]) {
-                                groups[layer] = {
-                                    x: [],
-                                    y: [],
-                                    name: layer,
-                                    type: 'scatter',
-                                    mode: 'lines+markers'
-                                };
-                            }
-                            // Parse timestamp string into Date object
-                            const date = new Date(item.timestamp);
-                            groups[layer].x.push(date);
-                            groups[layer].y.push(item.value);
-                            return groups;
-                        }, {});
-
-                        const traces = Object.values(layerGroups);
-                        const layout = {
-                            title: `${variable.find('option:selected').text()} over time`,
-                            xaxis: {
-                                title: 'Time',
-                                type: 'date'
-                            },
-                            yaxis: {
-                                title: variable.find('option:selected').text()
-                            },
-                            showlegend: true
-                        };
-
-                        Plotly.newPlot('plot', traces, layout);
-                    });
-                // });
+                });
+                return selections;
             }
 
-            // Event handlers
-            variable.change(function() {
-                const variableId = $(this).val();
-                updateLayers(variableId);
-            });
+            async function updatePlot() {
+                const selections = completeSelections();
+                if (!selections.length) {
+                    Plotly.purge('plot');
+                    $('#plotMessage').removeClass('d-none').text('Select a dataset, variable, and at least one layer.');
+                    return;
+                }
+                $('#plotMessage').removeClass('d-none').text('Loading series…');
+                try {
+                    const traces = await Promise.all(selections.flatMap(selection => selection.layers.map(layer => loadTrace(selection, layer))));
+                    if (traces.some(trace => trace.points.size === 0)) {
+                        Plotly.purge('plot');
+                        $('#plotMessage').text('At least one selected series contains no data.');
+                        return;
+                    }
+                    let commonDates = new Set(traces[0].points.keys());
+                    traces.slice(1).forEach(trace => commonDates = new Set([...commonDates].filter(date => trace.points.has(date))));
+                    const dates = [...commonDates].sort();
+                    if (!dates.length) {
+                        Plotly.purge('plot');
+                        $('#plotMessage').text('The selected series have no timestamps in common.');
+                        return;
+                    }
+                    $('#plotMessage').addClass('d-none');
+                    const textColor = getComputedStyle(document.body).color;
+                    const gridColor = getComputedStyle(document.documentElement)
+                        .getPropertyValue('--bs-border-color').trim() || 'rgba(128,128,128,0.3)';
+                    Plotly.react('plot', traces.map(trace => ({
+                        x: dates, y: dates.map(date => trace.points.get(date)), name: trace.name,
+                        type: 'scatter', mode: 'lines+markers'
+                    })), {
+                        xaxis: { title: 'Time', type: 'date', gridcolor: gridColor },
+                        yaxis: { title: 'Value', gridcolor: gridColor },
+                        showlegend: true,
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        font: { color: textColor },
+                        legend: {
+                            orientation: 'h', x: 0.5, xanchor: 'center', y: -0.16, yanchor: 'top',
+                            bgcolor: 'rgba(0,0,0,0)', borderwidth: 0, font: { color: textColor }
+                        },
+                        margin: { t: 30, r: 20, b: 140, l: 70 }
+                    }, { responsive: true });
+                } catch (error) {
+                    console.error(error);
+                    Plotly.purge('plot');
+                    $('#plotMessage').removeClass('d-none').text('Unable to load one or more selected series.');
+                }
+            }
 
-            layer.change(updatePlot);
+            container.on('change', '.dataset-select', function() {
+                const card = $(this).closest('.series-card');
+                const dataset = datasets.find(item => item.id === Number($(this).val()));
+                if (dataset) populateVariables(card, dataset);
+                else {
+                    card.find('.variable-select').prop('disabled', true).html('<option value="">Select a variable...</option>');
+                    resetLayers(card);
+                }
+                applySiteConstraint();
+                updatePlot();
+            });
+            container.on('change', '.variable-select', function() {
+                const card = $(this).closest('.series-card');
+                const dataset = datasets.find(item => item.id === Number(card.find('.dataset-select').val()));
+                const variable = dataset?.variables.find(item => item.id === Number($(this).val()));
+                if (variable) populateLayers(card, variable); else resetLayers(card);
+                updatePlot();
+            });
+            container.on('change', '.layer-select', updatePlot);
+            container.on('click', '.remove-series', function() {
+                $(this).closest('.series-card').remove();
+                container.find('.remove-series').toggle(container.children().length > 1);
+                applySiteConstraint();
+                updatePlot();
+            });
+            $('#addSeries').on('click', addSeries);
+            $('#restrictSite').on('change', applySiteConstraint);
+
+            function escapeHtml(value) { return $('<div>').text(value ?? '').html(); }
+            addSeries();
         });
     </script>
 }

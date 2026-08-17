@@ -25,6 +25,7 @@ public interface IApiClient
         int layerId, AppendObservationDataRequest request, CancellationToken cancellationToken = default);
     Task CompleteObservationGroupAsync(int groupId, CancellationToken cancellationToken = default);
     Task ActivateObservationGroupAsync(int groupId, CancellationToken cancellationToken = default);
+    Task DeleteObservationGroupAsync(int groupId, CancellationToken cancellationToken = default);
     /// <summary>
     /// Create a dataset group.
     /// </summary>

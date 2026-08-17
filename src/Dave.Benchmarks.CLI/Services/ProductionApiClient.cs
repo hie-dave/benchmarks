@@ -360,6 +360,13 @@ public class ProductionApiClient : IApiClient
         await ValidateResponseAsync(response);
     }
 
+    public async Task DeleteObservationGroupAsync(int groupId, CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response = await httpClient.DeleteAsync(
+            $"api/observations/groups/{groupId}", cancellationToken);
+        await ValidateResponseAsync(response);
+    }
+
     public async Task FailBenchmarkSubmissionAsync(int submissionId, string error, CancellationToken cancellationToken = default)
     {
         HttpResponseMessage response = await httpClient.PostAsJsonAsync($"api/submissions/{submissionId}/fail", error, cancellationToken);

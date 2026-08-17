@@ -18,6 +18,7 @@ public class DryRunApiClient : IApiClient
     public Task AppendObservationDataAsync(int layerId, AppendObservationDataRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task CompleteObservationGroupAsync(int groupId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task ActivateObservationGroupAsync(int groupId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task DeleteObservationGroupAsync(int groupId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     /// <summary>
     /// The logging service.
     /// </summary>

@@ -1,0 +1,222 @@
+@using System.Text.Json
+@using Dave.Benchmarks.Core.Models.Entities
+@model IEnumerable<IGrouping<DatasetGroup?, Dataset>>
+@{
+    ViewData["Title"] = "Relationships";
+    ViewData["FullWidth"] = true;
+    var datasetCatalog = JsonSerializer.Serialize(Model.SelectMany(group => group).DistinctBy(dataset => dataset.Id).Select(dataset => new
+    {
+        dataset.Id, dataset.Name, dataset.SimulationId,
+        Type = dataset is PredictionDataset ? "Prediction" : "Observation",
+        GroupName = dataset.Group?.Name,
+        Variables = dataset.Variables.DistinctBy(variable => variable.Id).OrderBy(variable => variable.Name).Select(variable => new
+        {
+            variable.Id, variable.Name, variable.Units,
+            Layers = variable.Layers.DistinctBy(layer => layer.Id).OrderBy(layer => layer.Name).Select(layer => new { layer.Id, layer.Name })
+        })
+    }), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h2 class="mb-1">Relationships</h2>
+        <p class="text-muted mb-0">Plot one site-level series against one or more series matched by timestamp.</p>
+    </div>
+    <button type="button" class="btn btn-outline-primary" id="addYSeries">Add Y series</button>
+</div>
+
+<div class="card border-primary mb-3" id="xSeries">
+    <div class="card-header"><strong>X axis</strong></div>
+    <div class="card-body"><div class="row g-3 selector-fields"></div></div>
+</div>
+<div id="siteConstraint" class="alert alert-info py-2 d-none"></div>
+<div id="ySeriesContainer" class="vstack gap-3 mb-4"></div>
+<div id="plotMessage" class="alert alert-light border">Select complete X and Y series.</div>
+<div id="relationshipPlot" style="width: 100%; height: 700px;"></div>
+
+@section Scripts {
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            const datasets = @Html.Raw(datasetCatalog);
+            const yContainer = $('#ySeriesContainer');
+            let nextYId = 1;
+
+            function datasetOptions(siteId = null) {
+                const groups = new Map();
+                datasets.filter(dataset => !siteId || dataset.simulationId === siteId).forEach(dataset => {
+                    const group = dataset.groupName || 'Ungrouped datasets';
+                    if (!groups.has(group)) groups.set(group, []);
+                    groups.get(group).push(dataset);
+                });
+                let html = '<option value="">Select a dataset...</option>';
+                [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([group, members]) => {
+                    html += `<optgroup label="${escapeHtml(group)}">`;
+                    members.sort((a, b) => a.name.localeCompare(b.name)).forEach(dataset =>
+                        html += `<option value="${dataset.id}">${escapeHtml(dataset.name)} — ${dataset.type}</option>`);
+                    html += '</optgroup>';
+                });
+                return html;
+            }
+
+            function selectorFields(siteId = null) {
+                return `
+                    <div class="col-lg-4"><label class="form-label">Dataset</label><select class="form-select dataset-select">${datasetOptions(siteId)}</select></div>
+                    <div class="col-lg-4"><label class="form-label">Variable</label><select class="form-select variable-select" disabled><option value="">Select a variable...</option></select></div>
+                    <div class="col-lg-4"><label class="form-label">Layer</label><select class="form-select layer-select" disabled><option value="" selected>Select a layer...</option></select></div>`;
+            }
+
+            $('#xSeries .selector-fields').html(selectorFields());
+
+            function addYSeries() {
+                const id = nextYId++;
+                const siteId = selectedDataset($('#xSeries'))?.simulationId || null;
+                yContainer.append(`
+                    <div class="card y-series" data-series-id="${id}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>Y series ${id}</strong>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-series">Remove</button>
+                        </div>
+                        <div class="card-body"><div class="row g-3 selector-fields">${selectorFields(siteId)}</div></div>
+                    </div>`);
+                yContainer.find('.remove-series').toggle(yContainer.children().length > 1);
+            }
+
+            function selectedDataset(card) {
+                return datasets.find(dataset => dataset.id === Number(card.find('.dataset-select').val())) || null;
+            }
+
+            function selectedSeries(card) {
+                const dataset = selectedDataset(card);
+                const variable = dataset?.variables.find(variable => variable.id === Number(card.find('.variable-select').val()));
+                const layer = variable?.layers.find(layer => layer.id === Number(card.find('.layer-select').val()));
+                return dataset && variable && layer ? { dataset, variable, layer } : null;
+            }
+
+            function populateVariables(card, dataset) {
+                let html = '<option value="">Select a variable...</option>';
+                dataset.variables.forEach(variable => {
+                    const units = variable.units ? ` (${escapeHtml(variable.units)})` : '';
+                    html += `<option value="${variable.id}">${escapeHtml(variable.name)}${units}</option>`;
+                });
+                card.find('.variable-select').html(html).prop('disabled', false);
+                card.find('.layer-select').html('<option value="" selected>Select a layer...</option>').prop('disabled', true);
+            }
+
+            function populateLayers(card, variable) {
+                let html = '<option value="" selected>Select a layer...</option>';
+                variable.layers.forEach(layer => html += `<option value="${layer.id}">${escapeHtml(layer.name)}</option>`);
+                card.find('.layer-select').html(html).prop('disabled', variable.layers.length === 0).val('');
+            }
+
+            function resetVariableAndLayer(card) {
+                card.find('.variable-select').prop('disabled', true).html('<option value="">Select a variable...</option>');
+                card.find('.layer-select').prop('disabled', true).html('<option value="" selected>Select a layer...</option>');
+            }
+
+            function enforceSite() {
+                const xDataset = selectedDataset($('#xSeries'));
+                const siteId = xDataset?.simulationId || null;
+                $('#siteConstraint').toggleClass('d-none', !siteId)
+                    .text(siteId ? `Y series are restricted to site “${siteId}”.` : '');
+                yContainer.find('.y-series').each(function() {
+                    const card = $(this);
+                    const current = selectedDataset(card);
+                    card.find('.dataset-select').html(datasetOptions(siteId));
+                    if (current && current.simulationId === siteId) {
+                        card.find('.dataset-select').val(String(current.id));
+                    } else {
+                        resetVariableAndLayer(card);
+                    }
+                });
+            }
+
+            async function loadPoints(series) {
+                const data = await $.get(`/api/data/dataset/${series.dataset.id}/variable/${series.variable.id}/data?layerId=${series.layer.id}`);
+                const points = new Map();
+                data.forEach(point => points.set(new Date(point.timestamp).toISOString(), point.value));
+                return points;
+            }
+
+            async function updatePlot() {
+                const x = selectedSeries($('#xSeries'));
+                const ys = yContainer.find('.y-series').map(function() { return selectedSeries($(this)); }).get().filter(Boolean);
+                if (!x || !ys.length) {
+                    Plotly.purge('relationshipPlot');
+                    $('#plotMessage').removeClass('d-none').text('Select complete X and Y series.');
+                    return;
+                }
+                $('#plotMessage').removeClass('d-none').text('Loading series…');
+                try {
+                    const xPoints = await loadPoints(x);
+                    const yPoints = await Promise.all(ys.map(loadPoints));
+                    const traces = ys.map((series, index) => {
+                        const dates = [...xPoints.keys()].filter(date => yPoints[index].has(date)).sort();
+                        return {
+                            x: dates.map(date => xPoints.get(date)),
+                            y: dates.map(date => yPoints[index].get(date)),
+                            text: dates,
+                            name: `${series.dataset.groupName || 'Ungrouped'} · ${series.dataset.name} · ${series.variable.name} · ${series.layer.name}`,
+                            type: 'scatter', mode: 'markers', hovertemplate: '%{text}<br>x=%{x}<br>y=%{y}<extra>%{fullData.name}</extra>'
+                        };
+                    }).filter(trace => trace.x.length);
+                    if (!traces.length) {
+                        Plotly.purge('relationshipPlot');
+                        $('#plotMessage').text('The selected X and Y series have no timestamps in common.');
+                        return;
+                    }
+                    $('#plotMessage').addClass('d-none');
+                    const textColor = getComputedStyle(document.body).color;
+                    const gridColor = getComputedStyle(document.documentElement)
+                        .getPropertyValue('--bs-border-color').trim() || 'rgba(128,128,128,0.3)';
+                    Plotly.react('relationshipPlot', traces, {
+                        xaxis: {
+                            title: `${x.dataset.groupName || 'Ungrouped'} · ${x.dataset.name} · ${x.variable.name}${x.variable.units ? ` (${x.variable.units})` : ''}`,
+                            gridcolor: gridColor
+                        },
+                        yaxis: { title: 'Y value', gridcolor: gridColor },
+                        showlegend: true,
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        font: { color: textColor },
+                        legend: {
+                            orientation: 'h', x: 0.5, xanchor: 'center', y: -0.16, yanchor: 'top',
+                            bgcolor: 'rgba(0,0,0,0)', borderwidth: 0, font: { color: textColor }
+                        },
+                        margin: { t: 30, r: 20, b: 140, l: 70 }
+                    }, { responsive: true });
+                } catch (error) {
+                    console.error(error);
+                    Plotly.purge('relationshipPlot');
+                    $('#plotMessage').removeClass('d-none').text('Unable to load one or more selected series.');
+                }
+            }
+
+            $(document).on('change', '.dataset-select', function() {
+                const card = $(this).closest('.card');
+                const dataset = selectedDataset(card);
+                if (dataset) populateVariables(card, dataset); else resetVariableAndLayer(card);
+                if (card.is('#xSeries')) enforceSite();
+                updatePlot();
+            });
+            $(document).on('change', '.variable-select', function() {
+                const card = $(this).closest('.card');
+                const dataset = selectedDataset(card);
+                const variable = dataset?.variables.find(variable => variable.id === Number($(this).val()));
+                if (variable) populateLayers(card, variable);
+                else card.find('.layer-select').prop('disabled', true).html('<option value="" selected>Select a layer...</option>');
+                updatePlot();
+            });
+            $(document).on('change', '.layer-select', updatePlot);
+            yContainer.on('click', '.remove-series', function() {
+                $(this).closest('.y-series').remove();
+                yContainer.find('.remove-series').toggle(yContainer.children().length > 1);
+                updatePlot();
+            });
+            $('#addYSeries').on('click', addYSeries);
+
+            function escapeHtml(value) { return $('<div>').text(value ?? '').html(); }
+            addYSeries();
+        });
+    </script>
+}

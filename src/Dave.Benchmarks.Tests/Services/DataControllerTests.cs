@@ -5,6 +5,8 @@ using Dave.Benchmarks.Web.Controllers;
 using LpjGuess.Core.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using Moq;
 
 namespace Dave.Benchmarks.Tests.Services;
@@ -26,6 +28,28 @@ public class DataControllerTests
     }
 
     [Fact]
+    public async Task ExplorerActions_FilterDatasetType_AndExposeDevelopmentFlag()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        PredictionDataset prediction = EvaluationSeed.CreatePredictionDataset(db);
+        ObservationDataset observation = EvaluationSeed.CreateObservationDataset(db);
+        Mock<IWebHostEnvironment> environment = new();
+        environment.SetupGet(e => e.EnvironmentName).Returns(Environments.Development);
+        DataController controller = new(db, Mock.Of<ILogger<DataController>>(), environment.Object);
+
+        ViewResult predictions = Assert.IsType<ViewResult>(await controller.Predictions());
+        var predictionGroups = Assert.IsAssignableFrom<IEnumerable<IGrouping<DatasetGroup?, Dataset>>>(predictions.Model);
+        Assert.Equal([prediction.Id], predictionGroups.SelectMany(g => g).Select(d => d.Id));
+        Assert.Equal(true, predictions.ViewData["ShowDeleteControls"]);
+
+        ViewResult observations = Assert.IsType<ViewResult>(await controller.Observations());
+        var observationGroups = Assert.IsAssignableFrom<IEnumerable<IGrouping<DatasetGroup?, Dataset>>>(observations.Model);
+        Assert.Equal([observation.Id], observationGroups.SelectMany(g => g).Select(d => d.Id));
+        Assert.Equal(true, observations.ViewData["ShowDeleteControls"]);
+    }
+
+    [Fact]
     public async Task Timeseries_ReturnsGroupedDatasetsView()
     {
         using SqliteTestDb fixture = SqliteTestDb.Create();
@@ -35,6 +59,22 @@ public class DataControllerTests
         DataController controller = CreateController(db);
 
         IActionResult result = await controller.Timeseries();
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.NotNull(view.Model);
+    }
+
+    [Fact]
+    public async Task Relationships_ReturnsGroupedDatasetsView()
+    {
+        using SqliteTestDb fixture = SqliteTestDb.Create();
+        using BenchmarksDbContext db = fixture.CreateContext();
+        ObservationDataset dataset = EvaluationSeed.CreateObservationDataset(
+            db, MatchingStrategy.ByName, active: true, simulationId: "AU-Tum");
+        EvaluationSeed.AddVariableLayer(db, dataset);
+        DataController controller = CreateController(db);
+
+        IActionResult result = await controller.Relationships();
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.NotNull(view.Model);

@@ -99,6 +99,19 @@ builder.Services.AddAuthorizationBuilder()
                 claim.Type == "role" && claim.Value == "observation_curator" &&
                 claim.Issuer == gitLabOAuthSettings.TokenIssuer));
         }
+    })
+    .AddPolicy(AuthorizationPolicies.DevelopmentOrGitLabProtectedRef, policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.RequireAssertion(_ => true);
+        }
+        else
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireClaim("project_id", authorisationSettings.AllowedGitlabProjectIds);
+            policy.RequireClaim("ref_protected", "true");
+        }
     });
 
 // Add database context

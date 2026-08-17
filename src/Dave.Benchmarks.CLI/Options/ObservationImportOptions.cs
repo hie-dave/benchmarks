@@ -10,4 +10,8 @@ public class ObservationImportOptions : OptionsBase
 
     [Option("activate", Default = false, HelpText = "Activate the completed release after import")]
     public bool Activate { get; set; }
+
+    [Option("cleanup-on-failure", Default = false,
+        HelpText = "Delete the partially imported observation group when import fails")]
+    public bool CleanupOnFailure { get; set; }
 }
