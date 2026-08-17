@@ -5,6 +5,49 @@
             // Use IntelliSense to find out which attributes exist for C# debugging
             // Use hover for the description of the existing attributes
             // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
+            "name": "CLI (Benchmark)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "prepare-cli-debug",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/src/Dave.Benchmarks.CLI/bin/Debug/net9.0/Dave.Benchmarks.CLI.dll",
+            "args": [
+                "benchmark",
+                "--merge-request-id",
+                "1",
+                "--pipeline-id",
+                "23",
+                "--commit-sha",
+                "62ae2bbfea1d61799d171700202c2ee665ae7b0f",
+                "--commit-message",
+                "Consolidate CI jobs. Only need one that runs against MRs.",
+                "--source-branch",
+                "cicd",
+                "--target-branch",
+                "lpjguess_dave",
+                // "--dry-run",
+                "--repo-path",
+                "/home/drew/code/lpj-guess/dave",
+                "--description",
+                "dave",
+                "--climate-dataset",
+                "ozflux",
+                "--temporal-resolution",
+                "3hour",
+                "--name",
+                "dave",
+                "--cleanup-on-failure"
+            ],
+            "cwd": "${workspaceFolder}/src/Dave.Benchmarks.CLI",
+            "envFile": "${workspaceFolder}/.vscode/.cli-debug.env",
+            // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            // Use IntelliSense to find out which attributes exist for C# debugging
+            // Use hover for the description of the existing attributes
+            // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
             "name": "CLI (Site)",
             "type": "coreclr",
             "request": "launch",

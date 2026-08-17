@@ -43,7 +43,8 @@ public class BenchmarkHandler
         await evaluator.RunAsync(new EvaluateOptions
         {
             SubmissionId = submissionId, Wait = true,
-            TimeoutSeconds = options.TimeoutSeconds, PollIntervalSeconds = options.PollIntervalSeconds
+            TimeoutSeconds = options.TimeoutSeconds,
+            PollIntervalSeconds = options.PollIntervalSeconds
         }, token);
     }
 }

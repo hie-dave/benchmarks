@@ -10,9 +10,10 @@ if [[ -z $jwt_project || -z $jwt_env_file ]]; then
     exit 2
 fi
 
-now=$(date -u +%s)
-tokens=$(dotnet user-jwts list --project "$jwt_project" --output json)
-mapfile -t live_jwt_ids < <(
+get_live_jwt_ids() {
+    local now tokens
+    now=$(date -u +%s)
+    tokens=$(dotnet user-jwts list --project "$jwt_project" --output json)
     jq -r --argjson now "$now" '
         .[]
         | select(
@@ -21,7 +22,34 @@ mapfile -t live_jwt_ids < <(
         )
         | .Id
     ' <<< "$tokens"
-)
+}
+
+mapfile -t live_jwt_ids < <(get_live_jwt_ids)
+
+if (( ${#live_jwt_ids[@]} == 0 )); then
+    development_settings="$(dirname "$jwt_project")/appsettings.Development.json"
+    mapfile -t allowed_project_ids < <(
+        jq -r '.Authorisation.AllowedGitlabProjectIds[]?' "$development_settings"
+    )
+
+    if (( ${#allowed_project_ids[@]} != 1 )); then
+        echo "Expected exactly one development AllowedGitlabProjectId; found ${#allowed_project_ids[@]}." >&2
+        exit 1
+    fi
+
+    echo "No live development JWT found; creating one." >&2
+    temporary_appsettings=$(mktemp)
+    trap 'rm -f "$temporary_appsettings"' EXIT
+    printf '{}\n' > "$temporary_appsettings"
+    dotnet user-jwts create \
+        --project "$jwt_project" \
+        --appsettings-file "$temporary_appsettings" \
+        --claim "project_id=${allowed_project_ids[0]}" \
+        --claim "ref_protected=true" \
+        --output json >/dev/null
+
+    mapfile -t live_jwt_ids < <(get_live_jwt_ids)
+fi
 
 if (( ${#live_jwt_ids[@]} != 1 )); then
     echo "Expected exactly one live JWT for $jwt_project; found ${#live_jwt_ids[@]}." >&2
