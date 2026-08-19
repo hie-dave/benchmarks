@@ -6,6 +6,8 @@ using Dave.Benchmarks.Web.Configuration;
 using Dave.Benchmarks.Web.Services.Evaluation;
 using Dave.Benchmarks.Web;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text.Json.Serialization;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -124,6 +126,15 @@ builder.Services.AddDbContext<BenchmarksDbContext>(options =>
             .MigrationsAssembly("Dave.Benchmarks.Web")
     ));
 
+builder.Services.AddHealthChecks()
+    .AddCheck(
+        "self",
+        () => HealthCheckResult.Healthy(),
+        tags: ["live"])
+    .AddDbContextCheck<BenchmarksDbContext>(
+        "database",
+        tags: ["ready"]);
+
 builder.Services.AddScoped<IEvaluationEngine, EvaluationEngine>();
 builder.Services.AddSingleton<IEvaluationJobQueue, EvaluationJobQueue>();
 builder.Services.AddHostedService<EvaluationWorker>();
@@ -155,6 +166,15 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live")
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 app.MapControllerRoute(
     name: "default",
